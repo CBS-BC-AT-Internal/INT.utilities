@@ -7,7 +7,7 @@
 ##  2022-08-09 AH: Fix bug on deploy new app, there have been an error for new apps
 ##  2022-08-12 FM: Add section "uninstall dependent apps", so no previous versions will stay as published
 ##  2022-09-07 JG: Add switch parameter "ForceSync" to toggle
-##  2023-10-09 JG: Add parameter properties, cleanup
+##  2023-10-09 JG: Add parameter properties, cleanup, allow relative app paths
 ##
 ##  ===  Abstract  ============================
 ##  This script will deploy a new app version. There must be a new version otherwise there will be an error.
