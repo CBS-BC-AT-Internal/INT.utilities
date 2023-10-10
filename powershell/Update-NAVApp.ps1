@@ -19,8 +19,10 @@
 ##  +) All dependant apps will be installed again.
 ##
 ##  ===  Example usage  ============================
-##  Update-NAVApp BC14-DEV -appPath "apps\Cronus_MyApp_1.0.1.3.app"
-##  Update-NAVApp -srvInst "BC14-DEV" -appPath "C:\\BC\apps\Cronus_MyApp_1.0.1.3.app" -ForceSync
+##  For terminal use:
+##  Update-NAVApp.ps1 BC14-DEV -appPath "apps\Cronus_MyApp_1.0.1.3.app"
+##  For .ps1 use:
+##  & Update-NAVApp.ps1 -srvInst "BC14-DEV" -appPath "C:\BC\apps\Cronus_MyApp_1.0.1.3.app" #-ForceSync
 
 param(
     [parameter(mandatory = $true, position = 0)]
