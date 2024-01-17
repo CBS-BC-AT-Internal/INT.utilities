@@ -18,7 +18,7 @@ Version: 1.0
 #>
 
 param (
-    [Parameter(Mandatory = $true)]
+    [Parameter(Position = 0, Mandatory = $true)]
     [string]$FilePath
 )
 
