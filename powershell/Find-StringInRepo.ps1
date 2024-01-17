@@ -5,16 +5,15 @@ Retrieves a list of all files containing a specified line across all branches in
 .DESCRIPTION
 This script reads a list of strings, provided in the parameters. For each string, it retrieves a list of all files containing the string across all branches in a Git repository. It then prints the string, the files containing the string, and the branches containing the files. This can be used to find AL objects that only exist in a single branch.
 
-.PARAMETER InputParameter
-Specifies the input parameter for the script.
+.PARAMETER FilePath
+A relative or absolute path to a file containing a list of strings to search for.
 
 .EXAMPLE
-.\Script.ps1 -InputParameter "example"
-This example demonstrates how to run the script with the specified input parameter.
+.\Find-StringInRepo.ps1 "C:\Temp\input.txt"
 
 .NOTES
-Author: [Your Name]
-Date: [Current Date]
+Author: [Jakob Gillinger]
+Date: [17.01.2024]
 Version: 1.0
 #>
 
@@ -86,6 +85,7 @@ foreach ($line in (Get-Content -Path $FilePath)) {
         $branches | ForEach-Object { Write-Host "    $_" }
     }
     else {
+        # if there are no files, then print a message
         Write-Host "Object ${line} not found in any branch."
     }
 }
