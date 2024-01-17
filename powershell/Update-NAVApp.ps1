@@ -32,10 +32,14 @@ param(
     [switch]$ForceSync
 )
 
-##  ===  Prepare PowerShell vor default BC18 installation
+##  ===  Prepare PowerShell for default BC18 installation
 
 Set-ExecutionPolicy unrestricted -Force
-Import-Module 'C:\Program Files\Microsoft Dynamics 365 Business Central\200\Service\NavAdminTool.ps1'
+if (!Get-Module -ListAvailable -Name 'Cloud.Ready.Software.NAV'){
+    Write-Host 'Cloud.Ready.Sofware.NAV module is missing. Installing the module...' -ForegroundColor Yellow
+    Install-Module -Name 'Cloud.Ready.Software.NAV'
+}
+Import-NAVModules
 
 ## ===  Color description  ======================
 
