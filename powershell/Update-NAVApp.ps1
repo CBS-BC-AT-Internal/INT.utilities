@@ -35,7 +35,7 @@ param(
 ##  ===  Prepare PowerShell for default BC18 installation
 
 Set-ExecutionPolicy unrestricted -Force
-if (!Get-Module -ListAvailable -Name 'Cloud.Ready.Software.NAV'){
+if (!(Get-Module -ListAvailable -Name 'Cloud.Ready.Software.NAV')){
     Write-Host 'Cloud.Ready.Sofware.NAV module is missing. Installing the module...' -ForegroundColor Yellow
     Install-Module -Name 'Cloud.Ready.Software.NAV'
 }
