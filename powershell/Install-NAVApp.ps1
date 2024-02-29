@@ -20,9 +20,9 @@
 ##
 ##  ===  Example usage  ============================
 ##  For terminal use:
-##  Update-NAVApp.ps1 BC14-DEV -appPath "apps\Cronus_MyApp_1.0.1.3.app"
+##  Install-NAVApp.ps1 BC14-DEV -appPath "apps\Cronus_MyApp_1.0.1.3.app"
 ##  For .ps1 use:
-##  & Update-NAVApp.ps1 -srvInst "BC14-DEV" -appPath "C:\BC\apps\Cronus_MyApp_1.0.1.3.app" #-ForceSync
+##  & Install-NAVApp.ps1 -srvInst "BC14-DEV" -appPath "C:\BC\apps\Cronus_MyApp_1.0.1.3.app" #-ForceSync
 
 param(
     [parameter(mandatory = $true, position = 0)]
