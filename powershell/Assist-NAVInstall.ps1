@@ -65,7 +65,7 @@
 #>
 param (
     [Parameter(Position = 0)]
-    [string]$configURI = "\NAVInstall.config.json",
+    [string]$configURI = "NAVInstall.config.json",
     [string]$server,
     [string]$appFolder,
     [string]$appName,
@@ -106,56 +106,68 @@ function Get-ConfigValue {
 function Get-OrDownloadFile {
     param (
         [Parameter(Position = 0, Mandatory = $true)]
-        [string]$fileURI
+        [string]$fileURI,
+        [string]$tempFolder = "${PSScriptRoot}\Helper_Temp"
     )
 
     if ($fileURI -match "^(http|https)://") {
-        $tempFolder = "${PSScriptRoot}\Helper_Temp"
+        if (-not (Test-Path -Path $tempFolder)) {
+            New-Item -ItemType Directory -Path $tempFolder | Out-Null
+        }
+
         $scriptFilename = $scriptURI.Split("/")[-1]
         $filePath = Join-Path -Path $tempFolder -ChildPath $scriptFilename
         Write-Host "Downloading script from $scriptURI"
         Invoke-WebRequest -Uri $scriptURI -OutFile $filePath
     }
-    elseif (-not [System.IO.Path]::IsPathRooted($fileURI)) {
-        $filePath = Join-Path -Path $PSScriptRoot -ChildPath $fileURI -Resolve
+    else {
+        $filePath = [System.IO.Path]::GetFullPath($fileURI)
     }
 
     if (-not (Test-Path -Path $filePath)) {
-        Write-Error "The specified file path ${filePath} does not exist."
+        Write-Error "The specified file `"${filePath}`" does not exist."
         Exit
     }
 
     return $filePath
 }
 
+$tempFolder = "${PSScriptRoot}\Helper_Temp"
+
 # Load the config.json file
-$configPath = Get-OrDownloadFile -fileURI $configURI
+$configPath = Get-OrDownloadFile -fileURI $configURI -tempFolder $tempFolder
+$config = Get-Content -Path $configPath | ConvertFrom-Json -AsHashtable
 
-$config = Get-Content -Path $configPath | ConvertFrom-Json
-
+# Get the app folder path
 if (-not $appFolder) {
     $appFolder = Get-ConfigValue "appFolder"
 }
 
+# Get the name of the app
 if (-not $appName) {
     $appName = Get-ConfigValue "appName"
 }
 
+# Get the server instance
 if (-not $server) {
     $servers = $config.servers
-    if (-not $servers || -not $servers.Keys) {
+    $serverKeys = $servers.Keys
+    if (-not $servers -or -not $serverKeys) {
         Write-Error "JSON object `"servers`" must have at least one child."
         Exit
     }
 
-    if ($servers.Keys.Count -eq 1) {
-        $server = $servers.Values[0]
+    if ($serverKeys.Count -eq 1) {
+        $selection = $serverKeys[0]
     }
     else {
-        $server = Read-Input -prompt "Please select a server" -options $servers.Keys
+        $selection = Read-Input -prompt "Please select a server" -options $serverKeys
     }
+
+    $server = $servers.$selection
 }
 
+# Get the application file path
 if (-not $appPath) {
     $appFilename = "${appName}_${appVersion}.app"
     $appFiles = Get-ChildItem -Path $appFolder -Filter $appFilename -Recurse |
@@ -183,18 +195,14 @@ else {
     }
 }
 
-# Check if the script path is a URL
-$scriptPath = Get-OrDownloadFile -fileURI $scriptURI
+# Download the install script if necessary
+$scriptPath = Get-OrDownloadFile -fileURI $scriptURI -tempFolder $tempFolder
 
 Write-Host "Server: $server"
 Write-Host "Application: $appPath"
 Write-Host "Script: $scriptPath"
 
-if (-not (Test-Path -Path $scriptPath)) {
-    Write-Error "The specified script path does not exist."
-    Exit
-}
-
+# Execute the script
 & $scriptPath $server -appPath $appPath -ForceSync:$ForceSync
 
 # Remove the temporary files
