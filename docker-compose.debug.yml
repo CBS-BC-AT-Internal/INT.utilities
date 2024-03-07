@@ -1,0 +1,8 @@
+version: '3.4'
+
+services:
+  int:
+    image: int
+    build:
+      context: .
+      dockerfile: ./Assist-NAVInstall.ps1.dockerfile

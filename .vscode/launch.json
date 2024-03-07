@@ -1,0 +1,18 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "PowerShell: Launch Script",
+      "type": "PowerShell",
+      "request": "launch",
+      "script": "${workspaceFolder}/powershell/Assist-NAVInstall.ps1",
+      "args": [
+        "-configURI",
+        "${workspaceFolder}/test/Assist-NAVInstall/NAVInstall.config.json",
+        "-appFolder",
+        "${workspaceFolder}/test/Assist-NAVInstall",
+        "-dry"
+      ]
+    }
+  ]
+}
