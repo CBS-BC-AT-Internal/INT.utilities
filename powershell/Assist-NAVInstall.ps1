@@ -45,6 +45,10 @@
 .PARAMETER ForceSync
     Switch parameter to force synchronization during the update process.
 
+.PARAMETER dry
+    Specifies whether to run the script without executing the update script.
+    Used for testing purposes. Default value is "$False".
+
 .EXAMPLE
     .\UpdateHelper.ps1 -server "BC-DEV1"
     Updates the default application on the server named "BC-DEV1"
@@ -72,7 +76,8 @@ param (
     [string]$appVersion = "*",
     [string]$appPath,
     [string]$scriptURI = "https://raw.githubusercontent.com/CBS-BC-AT-Internal/INT.utilities/v0.2.0/powershell/Install-NAVApp.ps1",
-    [switch]$ForceSync
+    [switch]$ForceSync,
+    [switch]$dry = $False
 )
 
 function Read-Input {
@@ -136,7 +141,20 @@ $tempFolder = "${PSScriptRoot}\Helper_Temp"
 
 # Load the config.json file
 $configPath = Get-OrDownloadFile -fileURI $configURI -tempFolder $tempFolder
-$config = Get-Content -Path $configPath | ConvertFrom-Json -AsHashtable
+$configFile = Get-Content -Path $configPath -Raw
+
+# ConvertFrom-Json -AsHashtable is not available in PowerShell 5
+if ($PSVersionTable.PSVersion.Major -le 5) {
+    $config = @{}
+    (ConvertFrom-Json $configFile).psobject.properties | ForEach-Object { $config[$_.Name] = $_.Value }
+}
+else {
+    $config = ConvertFrom-Json -AsHashtable $configFile
+}
+
+# Print configuration
+Write-Host "Configuration:"
+$config | Format-List
 
 # Get the app folder path
 if (-not $appFolder) {
@@ -153,18 +171,18 @@ if (-not $server) {
     $servers = $config.servers
     $serverKeys = $servers.Keys
     if (-not $servers -or -not $serverKeys) {
-        Write-Error "JSON object `"servers`" must have at least one child."
-        Exit
-    }
-
-    if ($serverKeys.Count -eq 1) {
-        $selection = $serverKeys[0]
+        $server = Read-Input -prompt "server instance"
     }
     else {
-        $selection = Read-Input -prompt "Please select a server" -options $serverKeys
-    }
+        if ($serverKeys.Count -eq 1) {
+            $selection = $serverKeys[0]
+        }
+        else {
+            $selection = Read-Input -prompt "Please select a server" -options $serverKeys
+        }
 
-    $server = $servers.$selection
+        $server = $servers.$selection
+    }
 }
 
 # Get the application file path
@@ -202,8 +220,10 @@ Write-Host "Server: $server"
 Write-Host "Application: $appPath"
 Write-Host "Script: $scriptPath"
 
-# Execute the script
-& $scriptPath $server -appPath $appPath -ForceSync:$ForceSync
+# Execute the script, if not in dry mode
+if (-not $dry) {
+    & $scriptPath $server -appPath $appPath -ForceSync:$ForceSync
+}
 
 # Remove the temporary files
 if (Test-Path -Path $tempFolder) {
