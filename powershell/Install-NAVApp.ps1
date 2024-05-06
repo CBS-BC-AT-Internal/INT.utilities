@@ -38,7 +38,7 @@ param(
 Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
 if (!(Get-Module -ListAvailable -Name 'Cloud.Ready.Software.NAV')){
     Write-Host 'Cloud.Ready.Sofware.NAV module is missing. Installing the module...' -ForegroundColor Yellow
-    Install-Module -Name 'Cloud.Ready.Software.NAV'
+    Install-Module -Name 'Cloud.Ready.Software.NAV' -Force -Scope CurrentUser
 }
 Import-NAVModules
 
