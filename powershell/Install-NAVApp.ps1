@@ -36,11 +36,7 @@ param(
 ##  ===  Prepare PowerShell for default BC18 installation
 
 Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
-if (!(Get-Module -ListAvailable -Name 'Cloud.Ready.Software.NAV')){
-    Write-Host 'Cloud.Ready.Sofware.NAV module is missing. Installing the module...' -ForegroundColor Yellow
-    Install-Module -Name 'Cloud.Ready.Software.NAV' -Force -Scope CurrentUser
-}
-Import-NAVModules -RunAsJob -WarningAction SilentlyContinue
+Import-Module 'C:\Program Files\Microsoft Dynamics 365 Business Central\140\Service\NavAdminTool.ps1'
 
 ## ===  Color description  ======================
 
