@@ -8,6 +8,7 @@
 ##  2022-08-12 FM: Add section "uninstall dependent apps", so no previous versions will stay as published
 ##  2022-09-07 JG: Add switch parameter "ForceSync" to toggle
 ##  2023-10-09 JG: Add parameter properties, cleanup, allow relative app paths
+##  2034-05-06 JG: Update execution policy, remove superfluous lines
 ##
 ##  ===  Abstract  ============================
 ##  This script will deploy a new app version. There must be a new version otherwise there will be an error.
@@ -34,7 +35,7 @@ param(
 
 ##  ===  Prepare PowerShell for default BC18 installation
 
-Set-ExecutionPolicy unrestricted -Force
+Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
 if (!(Get-Module -ListAvailable -Name 'Cloud.Ready.Software.NAV')){
     Write-Host 'Cloud.Ready.Sofware.NAV module is missing. Installing the module...' -ForegroundColor Yellow
     Install-Module -Name 'Cloud.Ready.Software.NAV'
@@ -95,20 +96,20 @@ function AddAppToDependentList() {
 
 ##  ===  Check parameters and app version  ==================================================
 
-$error.Clear();
+try {
+    if (Test-Path -Path $appPath -PathType Leaf) {
+        $appAbsPath = $appPath
+    }
+    else {
+        $cwd = Get-Location
+        $appAbsPath = Join-Path -Path $cwd -ChildPath $appPath
+    }
 
-if (Test-Path -Path $appPath -PathType Leaf) {
-    $appAbsPath = $appPath
+    $appInfo = Get-NAVAppInfo -Path $appAbsPath # get and check existing appInfo
 }
-else {
-    $cwd = Get-Location
-    $appAbsPath = Join-Path -Path $cwd -ChildPath $appPath
-}
-
-$appInfo = Get-NAVAppInfo -Path $appAbsPath # get and check existing appInfo
-if ($error) {
+catch {
     Write-Host 'File could not be found: ' $appAbsPath -ForegroundColor $styleError
-    break ;
+    return
 }
 
 $newAppName = $appInfo.Name
@@ -249,41 +250,4 @@ ForEach ($element in $currVersions) {
     }
 }
 
-Write-Host App $appInfo.Name Version $appInfo.Version DEPLOYED  !! -ForegroundColor $styleFinished
-
-return;
-break;
-
-##  ===  END of SCRIPT  ======================================
-
-##  ===  Code snippets  ======================================
-
-# Write-Host DO NOT Execeute -ForegroundColor Cyan
-# $depApp = $list.DependentApps.Get(0)
-
-# UnInstall-NAVApp -ServerInstance $srvInst -Name 'App-A'
-# Write-Host 'App "Teamcenter Interface Connector"' uninstalled ! -ForegroundColor $styleSuccess
-
-# Publish-NAVApp -ServerInstance $srvInst `
-# -Path "I:\Cegeka\AH\AH_app-C-B_1.0.0.1.app" `
-# -SkipVerification `
-# -PackageType Extension
-
-# $dependentList = @()
-# $dependentList += [PSCustomObject]@{
-#               Name     = 'Empty'
-#               Version  = '1.0.0.0'
-#               Level    = 0
-#           }
-
-# $cnt = $dependentList.Count
-# write-host $cnt $dependentList
-
-# $dependentList = AddAppToDependentList -AppName app-B-A -DependentList $dependentList
-# Write-Host Dependent Apps from $appInfo.Name Summary: $dependentList -ForegroundColor $styleSuccess
-# $cnt = $dependentList.Count
-# write-host $cnt $dependentList
-
-# UnPublish-NAVApp -ServerInstance $srvInst -Name 'App-B-A' -Version 1.0.0.1
-# Get-NAVAppInfo -Name App-B-A
-# UnInstall-NAVApp -ServerInstance $srvInst -Name App-B-A
+Write-Host "App $appInfo.Name Version $appInfo.Version DEPLOYED!!" -ForegroundColor $styleFinished
