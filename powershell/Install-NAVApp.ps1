@@ -178,46 +178,46 @@ if ($null -ne $oldVersion) {
 ##  ===  Publish new app  =========================
 
 if ($oldVersion -eq $appInfo.Version) {
-    Write-Host "Install-NAVApp -ServerInstance $srvInst -Name ${appInfo.Name} -Version $newVersionString" -ForegroundColor $style.Info
-    Install-NAVApp -ServerInstance $srvInst -Name $appInfo.Name -Version $appInfo.Version
+    Write-Host "Install-NAVApp -ServerInstance $srvInst -Name $newAppName -Version $newVersionString" -ForegroundColor $style.Info
+    Install-NAVApp -ServerInstance $srvInst -Name $newAppName -Version $appInfo.Version
 }
 else {
-    Write-Host "Publish-NAVApp -ServerInstance $srvInst -Path $appAbsPath -SkipVerification -PackageType Extension" -ForegroundColor $style.Info
+    Write-Host "Publish-NAVApp -ServerInstance $srvInst -Path $appPath -SkipVerification -PackageType Extension" -ForegroundColor $style.Info
     Publish-NAVApp -ServerInstance $srvInst `
-        -Path $appAbsPath `
+        -Path $appPath `
         -SkipVerification `
         -PackageType Extension
 
     switch ($ForceSync) {
         $true {
-            Write-Host "Sync-NavApp -ServerInstance $srvInst -Name ${appInfo.Name} -Version $newVersionString -Mode ForceSync" -ForegroundColor $style.Info
-            Sync-NavApp -ServerInstance $srvInst -Name $appInfo.Name -Version $appInfo.Version -Mode ForceSync
+            Write-Host "Sync-NavApp -ServerInstance $srvInst -Name $newAppName -Version $newVersionString -Mode ForceSync" -ForegroundColor $style.Info
+            Sync-NavApp -ServerInstance $srvInst -Name $newAppName -Version $appInfo.Version -Mode ForceSync
         }
         $false {
-            Write-Host "Sync-NavApp -ServerInstance $srvInst -Name ${appInfo.Name} -Version $newVersionString" -ForegroundColor $style.Info
-            Sync-NavApp -ServerInstance $srvInst -Name $appInfo.Name -Version $appInfo.Version
+            Write-Host "Sync-NavApp -ServerInstance $srvInst -Name $newAppName -Version $newVersionString" -ForegroundColor $style.Info
+            Sync-NavApp -ServerInstance $srvInst -Name $newAppName -Version $appInfo.Version
         }
     }
 
     if ($null -ne $oldVersion) {
-        Write-Host "Start-NAVAppDataUpgrade -ServerInstance $srvInst -Name ${appInfo.Name} -Version $newVersionString" -ForegroundColor $style.Info
-        Start-NAVAppDataUpgrade -ServerInstance $srvInst -Name $appInfo.Name -Version $appInfo.Version
+        Write-Host "Start-NAVAppDataUpgrade -ServerInstance $srvInst -Name $newAppName -Version $newVersionString" -ForegroundColor $style.Info
+        Start-NAVAppDataUpgrade -ServerInstance $srvInst -Name $newAppName -Version $appInfo.Version
     }
 }
 
-Write-Host App $appInfo.Name Version $appInfo.Version installed  -ForegroundColor $style.Success
+Write-Host App $newAppName Version $appInfo.Version installed  -ForegroundColor $style.Success
 
 ##  ===  Install dependent apps ==================
 
 foreach ($depAppName in $dependentList.Keys) {
     $depAppInfo = $dependentList[$depAppName]
-    Write-Host "Install-NAVApp -ServerInstance $srvInst -Name $depAppName -Version $newVersionString" -ForegroundColor $style.Info
+    Write-Host "Install-NAVApp -ServerInstance $srvInst -Name $depAppName -Version ${$depAppInfo.Version}" -ForegroundColor $style.Info
     Install-NAVApp -ServerInstance $srvInst -Name $depAppName -Version $depAppInfo.Version
 }
 
 ##  ===  Unpublish all previous app versions =====
 
-$currVersions = Get-NAVAppInfo -ServerInstance $srvInst -Name $appInfo.Name
+$currVersions = Get-NAVAppInfo -ServerInstance $srvInst -Name $newAppName
 $currVersions = $currVersions | Where-Object { ($_.Version -ne $appInfo.Version) -and ($_.Scope -eq 'Global') }
 
 foreach ($element in $currVersions) {
@@ -226,4 +226,4 @@ foreach ($element in $currVersions) {
     Write-Host "Unpublished ${element.Name} ${element.Version}" -ForegroundColor $style.Info
 }
 
-Write-Host "App ${appInfo.Name} Version ${appInfo.Version} DEPLOYED!!" -ForegroundColor $style.Finished
+Write-Host "App $newAppName Version $newVersionString DEPLOYED!!" -ForegroundColor $style.Finished
