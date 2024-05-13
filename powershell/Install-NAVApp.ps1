@@ -101,7 +101,7 @@ function Get-DependentAppList() {
         [hashtable] $appList
     )
     $depList = @{}
-    if($null -eq $appList) {
+    if ($null -eq $appList) {
         $appList = Initialize-AppList -srvInst $srvInst
         if ($null -eq $appList[$appName]) {
             Write-Host "Warning: App $appName not found on server instance $srvInst" -ForegroundColor $style.Warning
@@ -117,8 +117,8 @@ function Get-DependentAppList() {
         foreach ($dep in $appInfo.Dependencies) {
             Write-Verbose "- $dep"
         }
-        if($null -eq $appInfo.Dependencies) { continue }
-        if($appInfo.Dependencies -contains $appName) {
+        if ($null -eq $appInfo.Dependencies) { continue }
+        if ($appInfo.Dependencies -contains $appName) {
             $appList.Remove($appKey)
             Write-Host "Dependent found: $appKey Version ${appInfo.Version}"
             $depList[$appKey] = $appInfo
@@ -126,6 +126,31 @@ function Get-DependentAppList() {
         }
     }
     return $depList
+}
+
+function Unpublish-NAVApp() {
+    param(
+        [string] $srvInst,
+        $app
+    )
+    $appName = $app.Name
+    $appVersion = $app.Version -join '.'
+    Write-Host "Unpublish-NAVApp -ServerInstance $srvInst -Name $appName -Version $appVersion" -ForegroundColor $style.Info
+    Unpublish-NAVApp -ServerInstance $srvInst -Name $appName -Version $appVersion
+    Write-Host "Unpublished $appName $appVersion." -ForegroundColor $style.Info
+}
+
+function Unpublish-NAVApps() {
+    param(
+        [string] $srvInst,
+        [array] $apps
+    )
+    Write-Verbose "Unpublishing the following apps:"
+    Write-Verbose ($apps | Format-Table -AutoSize | Out-String)
+
+    foreach ($app in $apps) {
+        Unpublish-NAVApp srvInst $srvInst -app $app
+    }
 }
 
 ##  ===  Check parameters and app version  ==================================================
@@ -219,11 +244,6 @@ foreach ($depAppName in $dependentList.Keys) {
 
 $currVersions = Get-NAVAppInfo -ServerInstance $srvInst -Name $newAppName
 $currVersions = $currVersions | Where-Object { ($_.Version -ne $appInfo.Version) -and ($_.Scope -eq 'Global') }
-
-foreach ($element in $currVersions) {
-    Write-Host "Unpublish-NAVApp -ServerInstance $srvInst -Name $element.Name -Version $element.Version" -ForegroundColor $style.Info
-    Unpublish-NAVApp -ServerInstance $srvInst -Name $element.Name -Version $element.Version
-    Write-Host "Unpublished ${element.Name} ${element.Version}" -ForegroundColor $style.Info
-}
+Unpublish-NAVApps -srvInst $srvInst -apps $currVersions
 
 Write-Host "App $newAppName Version $newVersionString DEPLOYED!!" -ForegroundColor $style.Finished
