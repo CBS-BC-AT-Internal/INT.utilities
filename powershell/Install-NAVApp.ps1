@@ -128,7 +128,7 @@ function Get-DependentAppList() {
     return $depList
 }
 
-function Unpublish-NAVApp() {
+function Unpublish-OldNAVApp() {
     param(
         [string] $srvInst,
         $app
@@ -149,7 +149,7 @@ function Unpublish-NAVApps() {
     Write-Verbose ($apps | Format-Table -AutoSize | Out-String)
 
     foreach ($app in $apps) {
-        Unpublish-NAVApp srvInst $srvInst -app $app
+        Unpublish-OldNAVApp srvInst $srvInst -app $app
     }
 }
 
