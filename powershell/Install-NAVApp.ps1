@@ -122,14 +122,11 @@ function Get-DependentAppList() {
             $appList.Remove($appKey)
             Write-Host "Dependent found: $appKey Version ${appInfo.Version}"
             $depList[$appKey] = $appInfo
-            $depList += AddAppToDependentList -appName $appKey -appList $appList
+            $depList += Get-DependentAppList -appName $appKey -appList $appList
         }
     }
     return $depList
 }
-
-##  ===  Check parameters and app version  ==================================================
-
 
 ##  ===  Check parameters and app version  ==================================================
 
@@ -154,7 +151,7 @@ $newVersionString = $appInfo.Version -join '.'
 $oldVersionString = $oldVersion -join '.'
 
 if ($oldVersion -eq $appInfo.Version) {
-    Write-Host "Version ${appInfo.Version} of $newAppName has already been published - only "Sync-NAVApp" and "Start-NAVDataUpgrade" will be performed." -ForegroundColor $style.Warning
+    Write-Host "Version $newVersionString of $newAppName has already been published - only "Sync-NAVApp" and "Start-NAVDataUpgrade" will be performed." -ForegroundColor $style.Warning
     Write-Host 'All dependent Apps will be installed before.' -ForegroundColor $style.Info
     Write-Host "Publishing requires an app with a version greater than $oldVersionString." -ForegroundColor $style.Info
 }
@@ -162,7 +159,7 @@ if ($oldVersion -eq $appInfo.Version) {
 ##  ===  Uninstall dependent apps  ======================================
 
 if ($null -ne $oldVersion) {
-    Write-Host "Searching for dependent apps of $newAppName..." -ForegroundColor $style.Info
+    Write-Host "Searching for apps depending on $newAppName..." -ForegroundColor $style.Info
     [hashtable]$dependentList = Get-DependentAppList -appName $newAppName -srvInst $srvInst
 
     if ($dependentList.Count -eq 0) {
