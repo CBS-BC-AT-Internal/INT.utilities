@@ -149,7 +149,7 @@ function Unpublish-NAVApps() {
     Write-Verbose ($apps | Format-Table -AutoSize | Out-String)
 
     foreach ($app in $apps) {
-        Unpublish-OldNAVApp srvInst $srvInst -app $app
+        Unpublish-OldNAVApp -srvInst $srvInst -app $app
     }
 }
 
@@ -242,7 +242,7 @@ foreach ($depAppName in $dependentList.Keys) {
 
 ##  ===  Unpublish all previous app versions =====
 
-$currVersions = Get-NAVAppInfo -ServerInstance $srvInst -Name $newAppName
+$currVersions = Get-NAVAppInfo -ServerInstance $srvInst -Name $newAppName -WarningAction SilentlyContinue
 $currVersions = $currVersions | Where-Object { ($_.Version -ne $appInfo.Version) -and ($_.Scope -eq 'Global') }
 Unpublish-NAVApps -srvInst $srvInst -apps $currVersions
 
