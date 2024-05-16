@@ -8,7 +8,8 @@
 ##  2022-08-12 FM: Add section "uninstall dependent apps", so no previous versions will stay as published
 ##  2022-09-07 JG: Add switch parameter "ForceSync" to toggle
 ##  2023-10-09 JG: Add parameter properties, cleanup, allow relative app paths
-##  2034-05-06 JG: Update execution policy, remove superfluous lines
+##  2024-05-06 JG: Update execution policy, remove superfluous lines
+##  2024-05-16 JG: Major refactoring, use app ids, add option for NavAdminTool for module setup
 ##
 ##  ===  Abstract  ============================
 ##  This script will deploy a new app version. There must be a new version otherwise there will be an error.
@@ -27,41 +28,83 @@
 
 param(
     [parameter(mandatory = $true, position = 0)]
-    [string]$srvInst,
+    [string] $srvInst,
     [parameter(mandatory = $true)]
-    [string]$appPath,
-    [switch]$ForceSync,
-    [switch]$showColorKey
+    [string] $appPath,
+    [switch] $ForceSync,
+    [string] $bcVersion,
+    [string] $modulePath,
+    [switch] $showColorKey
 )
 
-##  ===  Prepare PowerShell for default BC18 installation
+function Initialize-Modules() {
+    param(
+        [string] $bcVersion,
+        [string] $modulePath
+    )
 
-Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
-$ErrorActionPreference = "Stop"
-if (!(Get-Module -ListAvailable -Name 'Cloud.Ready.Software.NAV')){
-    Write-Host 'Cloud.Ready.Sofware.NAV module is missing. Installing the module...' -ForegroundColor Yellow
-    Install-Module -Name 'Cloud.Ready.Software.NAV' -Force -Scope CurrentUser
+    if ($modulePath -eq '' -and $bcVersion -ne '') {
+        $modulePath = "C:\Program Files\Microsoft Dynamics 365 Business Central\$bcVersion\Service\NavAdminTool.ps1"
+    }
+
+    if ($modulePath -eq '') {
+        if (!(Get-Module -ListAvailable -Name 'Cloud.Ready.Software.NAV')) {
+            Write-Host 'Cloud.Ready.Sofware.NAV module is missing. Installing the module...' -ForegroundColor Yellow
+            Install-Module -Name 'Cloud.Ready.Software.NAV' -Force -Scope CurrentUser
+        }
+        Import-NAVModules -RunAsJob -WarningAction SilentlyContinue
+    }
+    else {
+        Import-Module $modulePath
+    }
 }
-Import-NAVModules -RunAsJob -WarningAction SilentlyContinue
 
-## ===  Color description  ======================
-
-$style = @{
-    Error    = "Red"
-    Finished = "Green"
-    Info     = "White"
-    Success  = "Cyan"
-    Warning  = "Magenta"
+function Get-AppId() {
+    param (
+        [Parameter(Mandatory = $true, Position = 0)]
+        $appInfo
+    )
+    return $appInfo.AppId.Value.Guid
 }
 
-if ($showColorKey) {
-    Write-Host " "
-    Write-Host "Color key used in this script:" -ForegroundColor Gray
-    Write-Host "Info .. Information, what is happening" -ForegroundColor $style.Info
-    Write-Host "Success .. step handled successfully" -ForegroundColor $style.Success
-    Write-Host "Finished .. script finished or main step successfully" -ForegroundColor $style.Finished
-    Write-Host "Warning .. something is not working as usual" -ForegroundColor $style.Warning
-    Write-Host "Error .. script failure with break" -ForegroundColor $style.Error
+function Initialize-ColorStyle() {
+    param (
+        $showColorKey
+    )
+    $style = @{
+        Error    = "Red"
+        Finished = "Green"
+        Info     = "White"
+        Success  = "Cyan"
+        Warning  = "Magenta"
+    }
+
+    if ($showColorKey) {
+        Write-Host " "
+        Write-Host "Color key used in this script:" -ForegroundColor Gray
+        Write-Host "Info .. Information, what is happening" -ForegroundColor $style.Info
+        Write-Host "Success .. step handled successfully" -ForegroundColor $style.Success
+        Write-Host "Finished .. script finished or main step successfully" -ForegroundColor $style.Finished
+        Write-Host "Warning .. something is not working as usual" -ForegroundColor $style.Warning
+        Write-Host "Error .. script failure with break" -ForegroundColor $style.Error
+    }
+
+    return $style
+}
+
+function Test-AppPath() {
+    param(
+        [string] $appPath
+    )
+
+    if (![System.IO.Path]::IsPathRooted($appPath)) {
+        $appPath = Join-Path $PWD.Path $appPath
+    }
+    if (![System.IO.File]::Exists($appPath)) {
+        throw "App could not be found: $appPath"
+    }
+
+    return $appPath
 }
 
 function Initialize-AppList() {
@@ -72,34 +115,36 @@ function Initialize-AppList() {
     $appArray = Get-NAVAppInfo -ServerInstance $srvInst -WarningAction SilentlyContinue
     $count = $appArray.Count
     for ($i = 0; $i -lt $count; $i++) {
-        $appName = $appArray[$i].Name
-        $appList[$appName] = Get-NAVAppInfo -ServerInstance $srvInst -Name $app.Name -WarningAction SilentlyContinue
+        $app = $appArray[$i]
+        $appId = Get-AppId $app
+        $appList[$appId.ToString()] = Get-NAVAppInfo -ServerInstance $srvInst -Id $appId -WarningAction SilentlyContinue
     }
     return $appList
 }
 
 function Remove-AppFromDependentList() {
     param(
-        [string] $appName,
+        [System.Guid] $appId,
         [hashtable] $appList
     )
 
-    $dependencies = $appList[$appName].Dependencies
+    $appIdStr = $appId.ToString()
+    $dependencies = $appList[$appIdStr].Dependencies
     foreach ($dep in $dependencies) {
-        $appList = Remove-AppFromDependentList -appName $dep.Name -appList $appList
+        $depAppId = Get-AppId $dep
+        $appList = Remove-AppFromDependentList -appId $depAppId -appList $appList
     }
 
-    if ($appList.ContainsKey($appName)) {
-        $appList.Remove($appName)
+    if ($appList.ContainsKey($appId)) {
+        $appList.Remove($appId)
     }
     return $appList
 }
 
 function Get-DependentAppList() {
-    ## Returns a list of apps dependent on the given app
     param(
         [Parameter(Mandatory = $true)]
-        [string] $appName,
+        [System.Guid] $appId,
         [Parameter(Mandatory = $true)]
         [string] $srvInst,
         [hashtable] $appList
@@ -107,38 +152,73 @@ function Get-DependentAppList() {
     $depList = @{}
     if ($null -eq $appList) {
         $appList = Initialize-AppList -srvInst $srvInst
-        if ($null -eq $appList[$appName]) {
-            Write-Host "Warning: App $appName not found on server instance $srvInst" -ForegroundColor $style.Warning
+        $appIdStr = $appId.ToString()
+        if ($null -eq $appList[$appIdStr]) {
+            Write-Host "Warning: App [$appIdStr] not found on server instance $srvInst" -ForegroundColor $style.Warning
             return $depList
         }
-        $appList = Remove-AppFromDependentList -appName $appName -appList $appList
+        $appList = Remove-AppFromDependentList -appId $appId -appList $appList
     }
 
     foreach ($appKey in $appList.Keys) {
         if ($depList.ContainsKey($appKey)) { continue }
+        if (!($appList.ContainsKey($appKey))) { continue }
+
         $appInfo = $appList[$appKey]
-        Write-Verbose "Checking dependencies of $appKey..."
+        $appName = $appInfo.Name
+        Write-Verbose "Checking dependencies of $appName..."
         foreach ($dep in $appInfo.Dependencies) {
             Write-Verbose "- $dep"
         }
         if ($null -eq $appInfo.Dependencies) { continue }
-        if ($appInfo.Dependencies -contains $appName) {
+        $appDependencies = $appInfo.Dependencies | ForEach-Object { Get-AppId $_ } # TODO: Replace with Get-AppId $appInfo.Dependencies
+        if ($appDependencies -contains $appId) {
             $appList.Remove($appKey)
-            Write-Host "Dependent found: $appKey Version ${appInfo.Version}"
+            Write-Host "Dependent found: $appName Version ${appInfo.Version}"
             $depList[$appKey] = $appInfo
-            $depList += Get-DependentAppList -appName $appKey -appList $appList
+            $depList += Get-DependentAppList -appId $appKey -appList $appList
         }
     }
     return $depList
 }
 
+function Install-App() {
+    param (
+        [Parameter(Mandatory = $true)]
+        $appInfo,
+        [string] $srvInst
+    )
+    if ($null -eq $appInfo) {
+        throw "AppInfo is missing."
+    }
+    $appName = $appInfo.Name
+    $appVersion = $appInfo.Version
+    Write-Host "Install-NAVApp -ServerInstance $srvInst -Name $appName -Version $($appVersion -join '.')" -ForegroundColor $style.Info
+    Install-NAVApp -ServerInstance $srvInst -Name $appName -Version $appVersion
+}
+
+function Uninstall-App() {
+    param (
+        [string] $srvInst,
+        $appInfo
+    )
+    $appName = $appInfo.Name
+    $appVersion = $appInfo.Version
+    Write-Verbose "Uninstall-NAVApp -ServerInstance $srvInst -Name $appName -Version $($appVersion -join '.')"
+    Uninstall-NAVApp -ServerInstance $srvInst -Name $appName -Version $appVersion
+}
+
 function Unpublish-OldNAVApp() {
     param(
-        [string] $srvInst,
-        $app
+        [Parameter(Mandatory = $true)]
+        $appInfo,
+        [string] $srvInst
     )
-    $appName = $app.Name
-    $appVersion = $app.Version -join '.'
+    if ($null -eq $appInfo) {
+        throw "AppInfo is missing."
+    }
+    $appName = $appInfo.Name
+    $appVersion = $appInfo.Version -join '.'
     Write-Host "Unpublish-NAVApp -ServerInstance $srvInst -Name $appName -Version $appVersion" -ForegroundColor $style.Info
     Unpublish-NAVApp -ServerInstance $srvInst -Name $appName -Version $appVersion
     Write-Host "Unpublished $appName $appVersion." -ForegroundColor $style.Info
@@ -152,102 +232,135 @@ function Unpublish-NAVApps() {
     Write-Verbose "Unpublishing the following apps:"
     Write-Verbose ($apps | Format-Table -AutoSize | Out-String)
 
-    foreach ($app in $apps) {
-        Unpublish-OldNAVApp -srvInst $srvInst -app $app
+    foreach ($appInfo in $apps) {
+        Unpublish-OldNAVApp -srvInst $srvInst -appInfo $appInfo
     }
 }
 
-##  ===  Check parameters and app version  ==================================================
+function Unpublish-OldVersions() {
+    param(
+        [Parameter(Mandatory = $true)]
+        $appInfo,
+        [string] $srvInst
+    )
+    if ($null -eq $appInfo) {
+        throw "AppInfo is missing."
+    }
+    $appId = Get-AppId $appInfo
+    $appName = $appInfo.Name
+    $appVersion = $appInfo.Version
 
-if (![System.IO.Path]::IsPathRooted($appPath)) {
-    $appPath = Join-Path $PWD.Path $appPath
+    $currVersions = Get-NAVAppInfo -ServerInstance $srvInst -Id $appId -WarningAction SilentlyContinue
+    $currVersions = $currVersions | Where-Object { ($_.Version -ne $appVersion) -and ($_.Scope -eq 'Global') }
+    if ($null -ne $currVersions) {
+        Write-Host "Unpublishing previous versions of $appName..." -ForegroundColor $style.Info
+        Unpublish-NAVApps -srvInst $srvInst -apps $currVersions
+    }
 }
 
-if (![System.IO.File]::Exists($appPath)) {
-    throw "App could not be found: $appPath"
+function Sync-App() {
+    param (
+        [Parameter(Mandatory = $true)]
+        $appInfo,
+        [string] $srvInst,
+        [bool] $ForceSync
+    )
+    if ($null -eq $appInfo) {
+        throw "AppInfo is missing."
+    }
+    $appName = $appInfo.Name
+    $appVersion = $appInfo.Version
+    $commandString = "Sync-NAVApp -ServerInstance $srvInst -Name $appName -Version $appVersion"
+
+    $syncParams = @{
+        ServerInstance = $srvInst
+        Name           = $appName
+        Version        = $appVersion
+    }
+    if ($ForceSync) {
+        $commandString += " -Mode ForceSync"
+        $syncParams.Add('Mode', 'ForceSync')
+    }
+
+    Write-Host $commandString -ForegroundColor $style.Info
+    Sync-NAVApp @syncParams
 }
 
-$appInfo = Get-NAVAppInfo -Path $appPath
+# === End of functions ===
 
-$newAppName = $appInfo.Name
-$oldVersion = $null
+$ErrorActionPreference = "Stop"
+Initialize-Modules -bcVersion $bcVersion -modulePath $modulePath
+$style = Initialize-ColorStyle -showColorKey $showColorKey
 
-$appOld = Get-NAVAppInfo -ServerInstance $srvInst -Name $newAppName
-if ($null -ne $appOld) {
-    $oldVersion = $appOld.Version
-}
-$newVersionString = $appInfo.Version -join '.'
-$oldVersionString = $oldVersion -join '.'
+$appPath = Test-AppPath -appPath $appPath
 
-if ($oldVersion -eq $appInfo.Version) {
-    Write-Host "Version $newVersionString of $newAppName has already been published - only "Sync-NAVApp" and "Start-NAVDataUpgrade" will be performed." -ForegroundColor $style.Warning
-    Write-Host 'All dependent Apps will be installed before.' -ForegroundColor $style.Info
-    Write-Host "Publishing requires an app with a version greater than $oldVersionString." -ForegroundColor $style.Info
+$newAppInfo = Get-NAVAppInfo -Path $appPath
+
+if ($null -eq $newAppInfo) {
+    throw "File could not be read: $appPath"
 }
 
-##  ===  Uninstall dependent apps  ======================================
+$newAppId = $newAppInfo.AppId
+$newAppName = $newAppInfo.Name
+$newVersion = $newAppInfo.Version
+$newVersionString = $newVersion -join '.'
 
-if ($null -ne $oldVersion) {
+$oldAppInfo = Get-NAVAppInfo -ServerInstance $srvInst -Id $newAppId -WarningAction SilentlyContinue
+$oldAppExists = ($null -ne $oldAppInfo)
+$sameVersion = $oldAppExists -and ($oldAppInfo.Version -eq $newVersion)
+$oldVersion = if ($oldAppExists) { $oldAppInfo.Version } else { $null }
+
+if ($sameVersion) {
+    Write-Host "$newAppName $newVersionString has already been published - only 'Sync-NAVApp' and 'Start-NAVDataUpgrade' will be performed." -ForegroundColor $style.Warning
+    Write-Host 'All dependent Apps will be installed beforehand.' -ForegroundColor $style.Info
+    Write-Host "Publishing requires an app with a version greater than $($oldVersion -join '.')." -ForegroundColor $style.Info
+}
+
+[hashtable] $dependentList = @{}
+
+if ($oldAppExists) {
     Write-Host "Searching for apps depending on $newAppName..." -ForegroundColor $style.Info
-    [hashtable]$dependentList = Get-DependentAppList -appName $newAppName -srvInst $srvInst
+    $dependentList = Get-DependentAppList -appId $newAppId -srvInst $srvInst
 
-    if ($dependentList.Count -eq 0) {
-        Write-Host "No dependent apps found." -ForegroundColor $style.Success
-    }
-    else {
-        Write-Host "Found a total of ${dependentList.Count} dependent apps" -ForegroundColor $style.Success
-        foreach ($depAppName in $dependentList.Keys) {
-            Write-Host "Uninstalling dependent app $depAppName" -ForegroundColor $style.Info
-            Write-Verbose "Uninstall-NAVApp -ServerInstance $srvInst -Name $depAppName"
-            UnInstall-NAVApp -ServerInstance $srvInst -Name $depAppName
+    if ($dependentList.Count -gt 0) {
+        Write-Host "Found a total of ${dependentList.Count} dependent apps." -ForegroundColor $style.Success
+        foreach ($depAppKey in $dependentList.Keys) {
+            $depAppInfo = $dependentList[$depAppKey]
+            Write-Host "Uninstalling dependent app ${depAppInfo.Name}..." -ForegroundColor $style.Info
+            Uninstall-App -srvInst $srvInst -appInfo $depAppInfo
         }
     }
+    else {
+        Write-Host "No dependent apps found." -ForegroundColor $style.Success
+    }
 }
 
-##  ===  Publish new app  =========================
-
-if ($oldVersion -eq $appInfo.Version) {
-    Write-Host "Install-NAVApp -ServerInstance $srvInst -Name $newAppName -Version $newVersionString" -ForegroundColor $style.Info
-    Install-NAVApp -ServerInstance $srvInst -Name $newAppName -Version $appInfo.Version
+if ($sameVersion) {
+    Install-App -srvInst $srvInst -appInfo $newAppInfo
 }
 else {
     Write-Host "Publish-NAVApp -ServerInstance $srvInst -Path $appPath -SkipVerification -PackageType Extension" -ForegroundColor $style.Info
-    Publish-NAVApp -ServerInstance $srvInst `
-        -Path $appPath `
-        -SkipVerification `
-        -PackageType Extension
+    Publish-NAVApp -ServerInstance $srvInst -Path $appPath -SkipVerification -PackageType Extension
+    Sync-App -srvInst $srvInst -appInfo $newAppInfo -ForceSync $ForceSync
 
-    switch ($ForceSync) {
-        $true {
-            Write-Host "Sync-NavApp -ServerInstance $srvInst -Name $newAppName -Version $newVersionString -Mode ForceSync" -ForegroundColor $style.Info
-            Sync-NavApp -ServerInstance $srvInst -Name $newAppName -Version $appInfo.Version -Mode ForceSync
-        }
-        $false {
-            Write-Host "Sync-NavApp -ServerInstance $srvInst -Name $newAppName -Version $newVersionString" -ForegroundColor $style.Info
-            Sync-NavApp -ServerInstance $srvInst -Name $newAppName -Version $appInfo.Version
-        }
-    }
-
-    if ($null -ne $oldVersion) {
+    if ($oldAppExists) {
         Write-Host "Start-NAVAppDataUpgrade -ServerInstance $srvInst -Name $newAppName -Version $newVersionString" -ForegroundColor $style.Info
-        Start-NAVAppDataUpgrade -ServerInstance $srvInst -Name $newAppName -Version $appInfo.Version
+        Start-NAVAppDataUpgrade -ServerInstance $srvInst -Name $newAppName -Version $newVersion
     }
 }
 
-Write-Host App $newAppName Version $appInfo.Version installed  -ForegroundColor $style.Success
+Write-Host "App $newAppName Version $newVersion installed!" -ForegroundColor $style.Success
 
-##  ===  Install dependent apps ==================
-
-foreach ($depAppName in $dependentList.Keys) {
-    $depAppInfo = $dependentList[$depAppName]
-    Write-Host "Install-NAVApp -ServerInstance $srvInst -Name $depAppName -Version ${$depAppInfo.Version}" -ForegroundColor $style.Info
-    Install-NAVApp -ServerInstance $srvInst -Name $depAppName -Version $depAppInfo.Version
+if ($oldAppExists -and $dependentList.Count -gt 0) {
+    Write-Host "Installing dependent apps..." -ForegroundColor $style.Info
+    foreach ($depAppKey in $dependentList.Keys) {
+        $depAppInfo = $dependentList[$depAppKey]
+        Install-App -srvInst $srvInst -appInfo $depAppInfo
+    }
 }
 
-##  ===  Unpublish all previous app versions =====
-
-$currVersions = Get-NAVAppInfo -ServerInstance $srvInst -Name $newAppName -WarningAction SilentlyContinue
-$currVersions = $currVersions | Where-Object { ($_.Version -ne $appInfo.Version) -and ($_.Scope -eq 'Global') }
-Unpublish-NAVApps -srvInst $srvInst -apps $currVersions
+if ($oldAppExists) {
+    Unpublish-OldVersions -srvInst $srvInst -appInfo $newAppInfo
+}
 
 Write-Host "App $newAppName Version $newVersionString DEPLOYED!!" -ForegroundColor $style.Finished
