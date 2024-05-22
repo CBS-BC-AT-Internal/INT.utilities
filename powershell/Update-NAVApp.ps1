@@ -122,6 +122,21 @@ function Initialize-AppList() {
     return $appList
 }
 
+function Get-NewestPublishedAppVersion() {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string] $srvInst,
+        [Parameter(Mandatory = $true)]
+        [string] $appId
+    )
+    $oldApps = Get-NAVAppInfo -ServerInstance $srvInst -Id $appId -WarningAction SilentlyContinue
+    if ($null -eq $oldApps) {
+        return $null
+    }
+    $oldApps = $oldApps | Sort-Object -Property Version -Descending
+    return $oldApps[0].Version
+}
+
 function Remove-AppFromDependentList() {
     param(
         [System.Guid] $appId,
@@ -305,12 +320,10 @@ $newAppName = $newAppInfo.Name
 $newVersion = $newAppInfo.Version
 $newVersionString = $newVersion -join '.'
 
-$oldAppInfo = Get-NAVAppInfo -ServerInstance $srvInst -Id $newAppId -WarningAction SilentlyContinue
+$oldVersion = Get-NewestPublishedAppVersion -srvInst $srvInst -appId $newAppId
 $oldAppExists = ($null -ne $oldAppInfo)
-$sameVersion = $oldAppExists -and ($oldAppInfo.Version -eq $newVersion)
-$oldVersion = if ($oldAppExists) { $oldAppInfo.Version } else { $null }
 
-if ($sameVersion) {
+if ($oldVersion -eq $newVersion) {
     Write-Host "$newAppName $newVersionString has already been published - only 'Sync-NAVApp' and 'Start-NAVDataUpgrade' will be performed." -ForegroundColor $style.Warning
     Write-Host 'All dependent Apps will be installed beforehand.' -ForegroundColor $style.Info
     Write-Host "Publishing requires an app with a version greater than $($oldVersion -join '.')." -ForegroundColor $style.Info
@@ -351,15 +364,14 @@ else {
 
 Write-Host "App $newAppName Version $newVersion installed!" -ForegroundColor $style.Success
 
-if ($oldAppExists -and $dependentList.Count -gt 0) {
-    Write-Host "Installing dependent apps..." -ForegroundColor $style.Info
-    foreach ($depAppKey in $dependentList.Keys) {
-        $depAppInfo = $dependentList[$depAppKey]
-        Install-App -srvInst $srvInst -appInfo $depAppInfo
-    }
-}
-
 if ($oldAppExists) {
+    if ($dependentList.Count -gt 0) {
+        Write-Host "Installing dependent apps..." -ForegroundColor $style.Info
+        foreach ($depAppKey in $dependentList.Keys) {
+            $depAppInfo = $dependentList[$depAppKey]
+            Install-App -srvInst $srvInst -appInfo $depAppInfo
+        }
+    }
     Unpublish-OldVersions -srvInst $srvInst -appInfo $newAppInfo
 }
 
