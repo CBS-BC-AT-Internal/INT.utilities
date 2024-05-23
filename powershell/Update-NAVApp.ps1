@@ -321,7 +321,7 @@ $newVersion = $newAppInfo.Version
 $newVersionString = $newVersion -join '.'
 
 $oldVersion = Get-NewestPublishedAppVersion -srvInst $srvInst -appId $newAppId
-$oldAppExists = ($null -ne $oldAppInfo)
+$oldAppExists = ($null -ne $oldVersion)
 
 if ($oldVersion -eq $newVersion) {
     Write-Host "$newAppName $newVersionString has already been published - only 'Sync-NAVApp' and 'Start-NAVDataUpgrade' will be performed." -ForegroundColor $style.Warning
