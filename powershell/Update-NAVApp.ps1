@@ -64,7 +64,18 @@ function Get-AppId() {
         [Parameter(Mandatory = $true, Position = 0)]
         $appInfo
     )
-    return $appInfo.AppId.Value.Guid
+
+    if (-not $appInfo.PSObject.Properties.Name -contains 'AppId') {
+        throw "AppInfo is missing the parameter 'AppId' - type: $($appInfo.GetType().FullName)"
+    }
+
+    $appId = $appInfo.AppId
+
+    switch ($true) {
+        ($appId -is [System.Guid]) { return $appId }
+        ($appId -is [Microsoft.Dynamics.Nav.Apps.Types.AppId]) { return $appId.Value }
+        default { throw "AppId is not a valid type: $($appId.GetType().FullName)" }
+    }
 }
 
 function Initialize-ColorStyle() {
