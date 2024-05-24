@@ -28,11 +28,14 @@
 
 param(
     [parameter(mandatory = $true, position = 0)]
+    [ValidateNotNullOrEmpty()]
     [string] $srvInst,
     [parameter(mandatory = $true)]
+    [ValidateScript({ Test-Path $_ -PathType Leaf })]
     [string] $appPath,
     [switch] $ForceSync,
     [string] $bcVersion,
+    [ValidateScript({ if (![string]::IsNullOrEmpty($_)) { Test-Path $_ -PathType Leaf } else { $true } })]
     [string] $modulePath,
     [switch] $showColorKey
 )
@@ -40,14 +43,16 @@ param(
 function Initialize-Modules() {
     param(
         [string] $bcVersion,
+        [ValidateScript({ if (![string]::IsNullOrEmpty($_)) { Test-Path $_ -PathType Leaf } else { $true } })]
         [string] $modulePath
     )
 
-    if ($modulePath -eq '' -and $bcVersion -ne '') {
+    if ([string]::IsNullOrEmpty($modulePath) -and ![string]::IsNullOrEmpty($bcVersion)) {
         $modulePath = "C:\Program Files\Microsoft Dynamics 365 Business Central\$bcVersion\Service\NavAdminTool.ps1"
     }
 
-    if ($modulePath -eq '') {
+    if ([string]::IsNullOrEmpty($modulePath)) {
+
         if (!(Get-Module -ListAvailable -Name 'Cloud.Ready.Software.NAV')) {
             Write-Host 'Cloud.Ready.Sofware.NAV module is missing. Installing the module...' -ForegroundColor Yellow
             Install-Module -Name 'Cloud.Ready.Software.NAV' -Force -Scope CurrentUser
@@ -80,7 +85,7 @@ function Get-AppId() {
 
 function Initialize-ColorStyle() {
     param (
-        $showColorKey
+        [bool] $showColorKey = $false
     )
     $style = @{
         Error    = "Red"
@@ -124,11 +129,11 @@ function Initialize-AppList() {
     )
     $appList = @{}
     $appArray = Get-NAVAppInfo -ServerInstance $srvInst -WarningAction SilentlyContinue
-    $count = $appArray.Count
+    [Int32] $count = $appArray.Count
     for ($i = 0; $i -lt $count; $i++) {
         $app = $appArray[$i]
-        $appId = Get-AppId $app
-        $appList[$appId.ToString()] = Get-NAVAppInfo -ServerInstance $srvInst -Id $appId -WarningAction SilentlyContinue
+        [System.Guid] $appId = Get-AppId $app
+        $appList[$appId.Guid] = Get-NAVAppInfo -ServerInstance $srvInst -Id $appId -WarningAction SilentlyContinue
     }
     return $appList
 }
@@ -138,7 +143,7 @@ function Get-NewestPublishedAppVersion() {
         [Parameter(Mandatory = $true)]
         [string] $srvInst,
         [Parameter(Mandatory = $true)]
-        [string] $appId
+        [System.Guid] $appId
     )
     $oldApps = Get-NAVAppInfo -ServerInstance $srvInst -Id $appId -WarningAction SilentlyContinue
     if ($null -eq $oldApps) {
@@ -154,10 +159,9 @@ function Remove-AppFromDependentList() {
         [hashtable] $appList
     )
 
-    $appIdStr = $appId.ToString()
-    $dependencies = $appList[$appIdStr].Dependencies
+    $dependencies = $appList[$appId.Guid].Dependencies
     foreach ($dep in $dependencies) {
-        $depAppId = Get-AppId $dep
+        [System.Guid] $depAppId = Get-AppId $dep
         $appList = Remove-AppFromDependentList -appId $depAppId -appList $appList
     }
 
@@ -178,7 +182,7 @@ function Get-DependentAppList() {
     $depList = @{}
     if ($null -eq $appList) {
         $appList = Initialize-AppList -srvInst $srvInst
-        $appIdStr = $appId.ToString()
+        [string] $appIdStr = $appId.Guid
         if ($null -eq $appList[$appIdStr]) {
             Write-Host "Warning: App [$appIdStr] not found on server instance $srvInst" -ForegroundColor $style.Warning
             return $depList
@@ -197,7 +201,7 @@ function Get-DependentAppList() {
             Write-Verbose "- $dep"
         }
         if ($null -eq $appInfo.Dependencies) { continue }
-        $appDependencies = $appInfo.Dependencies | ForEach-Object { Get-AppId $_ } # TODO: Replace with Get-AppId $appInfo.Dependencies
+        [System.Guid[]] $appDependencies = $appInfo.Dependencies | ForEach-Object { Get-AppId $_ }
         if ($appDependencies -contains $appId) {
             $appList.Remove($appKey)
             Write-Host "Dependent found: $appName Version ${appInfo.Version}"
@@ -272,9 +276,9 @@ function Unpublish-OldVersions() {
     if ($null -eq $appInfo) {
         throw "AppInfo is missing."
     }
-    $appId = Get-AppId $appInfo
-    $appName = $appInfo.Name
-    $appVersion = $appInfo.Version
+    [System.Guid] $appId = Get-AppId $appInfo
+    [string] $appName = $appInfo.Name
+    [System.Version] $appVersion = $appInfo.Version
 
     $currVersions = Get-NAVAppInfo -ServerInstance $srvInst -Id $appId -WarningAction SilentlyContinue
     $currVersions = $currVersions | Where-Object { ($_.Version -ne $appVersion) -and ($_.Scope -eq 'Global') }
@@ -326,13 +330,13 @@ if ($null -eq $newAppInfo) {
     throw "File could not be read: $appPath"
 }
 
-$newAppId = $newAppInfo.AppId
-$newAppName = $newAppInfo.Name
-$newVersion = $newAppInfo.Version
-$newVersionString = $newVersion -join '.'
+[System.Guid] $newAppId = Get-AppId $newAppInfo
+[string] $newAppName = $newAppInfo.Name
+[System.Version] $newVersion = $newAppInfo.Version
+[string] $newVersionString = $newVersion -join '.'
 
-$oldVersion = Get-NewestPublishedAppVersion -srvInst $srvInst -appId $newAppId
-$oldAppExists = ($null -ne $oldVersion)
+[System.Version] $oldVersion = Get-NewestPublishedAppVersion -srvInst $srvInst -appId $newAppId
+[bool] $oldAppExists = ($null -ne $oldVersion)
 
 if ($oldVersion -eq $newVersion) {
     Write-Host "$newAppName $newVersionString has already been published - only 'Sync-NAVApp' and 'Start-NAVDataUpgrade' will be performed." -ForegroundColor $style.Warning
