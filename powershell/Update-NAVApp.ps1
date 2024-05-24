@@ -337,8 +337,9 @@ if ($null -eq $newAppInfo) {
 
 [System.Version] $oldVersion = Get-NewestPublishedAppVersion -srvInst $srvInst -appId $newAppId
 [bool] $oldAppExists = ($null -ne $oldVersion)
+[bool] $sameVersion = ($oldVersion -eq $newVersion)
 
-if ($oldVersion -eq $newVersion) {
+if ($sameVersion) {
     Write-Host "$newAppName $newVersionString has already been published - only 'Sync-NAVApp' and 'Start-NAVDataUpgrade' will be performed." -ForegroundColor $style.Warning
     Write-Host 'All dependent Apps will be installed beforehand.' -ForegroundColor $style.Info
     Write-Host "Publishing requires an app with a version greater than $($oldVersion -join '.')." -ForegroundColor $style.Info
