@@ -1,18 +1,10 @@
 ##  ===  Developer  ============================
-##  Andreas Hargassner (AH)
-##  Florian Marek (FM)
-##
-##  ===  Release Notes  ============================
-##  2022-05-13 AH: Add function "AddAppToDependentList"
-##  2022-08-09 AH: Fix bug on deploy new app, there have been an error for new apps
-##  2022-08-12 FM: Add section "uninstall dependent apps", so no previous versions will stay as published
-##  2022-09-07 JG: Add switch parameter "ForceSync" to toggle
-##  2023-10-09 JG: Add parameter properties, cleanup, allow relative app paths
-##  2024-05-06 JG: Update execution policy, remove superfluous lines
-##  2024-05-16 JG: Major refactoring, use app ids, add option for NavAdminTool for module setup
+##  Andreas Hargassner
+##  Florian Marek
+##  Jakob Gillinger
 ##
 ##  ===  Abstract  ============================
-##  This script will deploy a new app version. There must be a new version otherwise there will be an error.
+##  This script will deploy a new app version.
 ##  These steps are processed:
 ##  +) All dependent apps will be uninstalled (if not so far)
 ##  +) The new app will be published
@@ -37,14 +29,19 @@ param(
     [string] $bcVersion,
     [ValidateScript({ if (![string]::IsNullOrEmpty($_)) { Test-Path $_ -PathType Leaf } else { $true } })]
     [string] $modulePath,
-    [switch] $showColorKey
+    [switch] $showColorKey,
+    [switch] $runAsJob
 )
 
 function Initialize-Modules() {
     param(
+        [Parameter(Mandatory = $false)]
         [string] $bcVersion,
         [ValidateScript({ if (![string]::IsNullOrEmpty($_)) { Test-Path $_ -PathType Leaf } else { $true } })]
-        [string] $modulePath
+        [Parameter(Mandatory = $false)]
+        [string] $modulePath,
+        [Parameter(Mandatory = $false)]
+        [switch] $runAsJob
     )
 
     if ([string]::IsNullOrEmpty($modulePath) -and ![string]::IsNullOrEmpty($bcVersion)) {
@@ -52,12 +49,11 @@ function Initialize-Modules() {
     }
 
     if ([string]::IsNullOrEmpty($modulePath)) {
-
         if (!(Get-Module -ListAvailable -Name 'Cloud.Ready.Software.NAV')) {
             Write-Host 'Cloud.Ready.Sofware.NAV module is missing. Installing the module...' -ForegroundColor Yellow
             Install-Module -Name 'Cloud.Ready.Software.NAV' -Force -Scope CurrentUser
         }
-        Import-NAVModules -RunAsJob -WarningAction SilentlyContinue
+        Import-NAVModules -WarningAction SilentlyContinue -RunAsJob:$runAsJob
     }
     else {
         Import-Module $modulePath
@@ -93,6 +89,7 @@ function Initialize-ColorStyle() {
         Info     = "White"
         Success  = "Cyan"
         Warning  = "Magenta"
+        Command  = "Gray"
     }
 
     if ($showColorKey) {
@@ -103,6 +100,7 @@ function Initialize-ColorStyle() {
         Write-Host "Finished .. script finished or main step successfully" -ForegroundColor $style.Finished
         Write-Host "Warning .. something is not working as usual" -ForegroundColor $style.Warning
         Write-Host "Error .. script failure with break" -ForegroundColor $style.Error
+        Write-Host "Command .. command & parameters sent to terminal" -ForegroundColor $style.Command
     }
 
     return $style
@@ -223,7 +221,7 @@ function Install-App() {
     }
     $appName = $appInfo.Name
     $appVersion = $appInfo.Version
-    Write-Host "Install-NAVApp -ServerInstance $srvInst -Name $appName -Version $($appVersion -join '.')" -ForegroundColor $style.Info
+    Write-Host "Install-NAVApp -ServerInstance $srvInst -Name $appName -Version $($appVersion -join '.')" -ForegroundColor $style.Command
     Install-NAVApp -ServerInstance $srvInst -Name $appName -Version $appVersion
 }
 
@@ -249,7 +247,7 @@ function Unpublish-OldNAVApp() {
     }
     $appName = $appInfo.Name
     $appVersion = $appInfo.Version -join '.'
-    Write-Host "Unpublish-NAVApp -ServerInstance $srvInst -Name $appName -Version $appVersion" -ForegroundColor $style.Info
+    Write-Host "Unpublish-NAVApp -ServerInstance $srvInst -Name $appName -Version $appVersion" -ForegroundColor $style.Command
     Unpublish-NAVApp -ServerInstance $srvInst -Name $appName -Version $appVersion
     Write-Host "Unpublished $appName $appVersion." -ForegroundColor $style.Info
 }
@@ -312,14 +310,14 @@ function Sync-App() {
         $syncParams.Add('Mode', 'ForceSync')
     }
 
-    Write-Host $commandString -ForegroundColor $style.Info
+    Write-Host $commandString -ForegroundColor $style.Command
     Sync-NAVApp @syncParams
 }
 
 # === End of functions ===
 
 $ErrorActionPreference = "Stop"
-Initialize-Modules -bcVersion $bcVersion -modulePath $modulePath
+Initialize-Modules -bcVersion $bcVersion -modulePath $modulePath -runAsJob:$runAsJob
 $style = Initialize-ColorStyle -showColorKey $showColorKey
 
 $appPath = Test-AppPath -appPath $appPath
@@ -368,12 +366,13 @@ if ($sameVersion) {
     Install-App -srvInst $srvInst -appInfo $newAppInfo
 }
 else {
-    Write-Host "Publish-NAVApp -ServerInstance $srvInst -Path $appPath -SkipVerification -PackageType Extension" -ForegroundColor $style.Info
+    Write-Host "Publish-NAVApp -ServerInstance $srvInst -Path $appPath -SkipVerification -PackageType Extension" -ForegroundColor $style.Command
     Publish-NAVApp -ServerInstance $srvInst -Path $appPath -SkipVerification -PackageType Extension
+    Write-Host "Sync-NAVApp -ServerInstance $srvInst -Name $newAppName -Version $newVersionString -ForceSync $ForceSync" -ForegroundColor $style.Command
     Sync-App -srvInst $srvInst -appInfo $newAppInfo -ForceSync $ForceSync
 
     if ($oldAppExists) {
-        Write-Host "Start-NAVAppDataUpgrade -ServerInstance $srvInst -Name $newAppName -Version $newVersionString" -ForegroundColor $style.Info
+        Write-Host "Start-NAVAppDataUpgrade -ServerInstance $srvInst -Name $newAppName -Version $newVersionString" -ForegroundColor $style.Command
         Start-NAVAppDataUpgrade -ServerInstance $srvInst -Name $newAppName -Version $newVersion
     }
 }
