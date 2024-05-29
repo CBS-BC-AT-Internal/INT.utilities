@@ -1,16 +1,20 @@
 param(
-  [Parameter(Mandatory = $true)]
+  [Parameter(Mandatory = $true, Position = 0)]
   [string]$serverInstance,
-  [Parameter(Mandatory = $true)]
+  [Parameter(Mandatory = $false)]
+  [ValidateSet('flf', 'bclicense', '(flf|bclicense)')]
+  [string]$fileEnding = '(flf|bclicense)',
+  [Parameter(Mandatory = $true, Position = 1)]
   [ValidateScript(
     {
+      $pattern = '.*\.' + $fileEnding
       (Test-Path -Path $_ -PathType 'Container') -or
       (
         (
           (Test-Path -Path $_ -PathType 'Leaf') -or
           ($_ -match '^https?://')
         ) -and
-        ($_ -match '.*\.(flf|bclicense)')
+        ($_ -match $pattern)
       )
     }
   )]
@@ -31,12 +35,12 @@ enum PathType {
 
 function Initialize-Modules() {
   param(
-    [Parameter(Mandatory = $false)]
+    [Parameter(Mandatory = $true)]
     [string] $bcVersion,
     [ValidateScript({ if (![string]::IsNullOrEmpty($_)) { Test-Path $_ -PathType Leaf } else { $true } })]
-    [Parameter(Mandatory = $false)]
+    [Parameter(Mandatory = $true)]
     [string] $modulePath,
-    [Parameter(Mandatory = $false)]
+    [Parameter(Mandatory = $true)]
     [switch] $runAsJob
   )
 
@@ -59,9 +63,12 @@ function Initialize-Modules() {
 function DeterminePathType() {
   param(
     [Parameter(Mandatory = $true)]
-    [string]$path
+    [string]$path,
+    [Parameter(Mandatory = $true)]
+    [string]$fileEnding
   )
-  if ($path -match '.*\.(flf|bclicense)$') {
+  $pattern = '.*\.' + $fileEnding
+  if ($path -match $pattern) {
     if ($path -match '^https?://') {
       return [PathType]::URL
     }
@@ -88,16 +95,19 @@ function DownloadLicenseFile() {
 function GetLicenseFiles() {
   param(
     [Parameter(Mandatory = $true)]
-    $licensePath
+    $licensePath,
+    [Parameter(Mandatory = $true)]
+    [string]$fileEnding
   )
-  [PathType]$pathType = DeterminePathType -path $licensePath
+  [PathType]$pathType = DeterminePathType -path $licensePath -fileEnding $fileEnding
   switch ($pathType) {
     "File" {
       return Get-Item -Path $licensePath
     }
     "Container" {
+      $pattern = '^[^_]*_BC\d{2}_[^_]*_Expires_\d{4}-\d{2}-\d{2}\.' + $fileEnding + '$'
       return Get-ChildItem -Path $licensePath | Where-Object {
-        $_.Name -match '^[^_]*_BC\d{2}_[^_]*_Expires_\d{4}-\d{2}-\d{2}\.(flf|bclicense)$'
+        $_.Name -match $pattern
       }
     }
     "URL" {
@@ -136,14 +146,14 @@ function GetLatestLicenseFile() {
 
 $ErrorActionPreference = 'Stop'
 
-$licenseFiles = GetLicenseFiles -licensePath $licensePath
+$licenseFiles = GetLicenseFiles -licensePath $licensePath -fileEnding $fileEnding
 $latestFile = GetLatestLicenseFile -licenseFiles $licenseFiles
 
 Initialize-Modules -runAsJob:$runAsJob -bcVersion $bcVersion -modulePath $modulePath
 Write-Host "Importing license file '$latestFile' to '$serverInstance'..."
 Import-NAVServerLicense -ServerInstance $serverInstance -LicenseFile $latestFile
 
-if (DeterminePathType -path $licensePath -eq [PathType]::URL) {
+if ((DeterminePathType -path $licensePath -fileEnding $fileEnding) -eq "URL") {
   Remove-Item -Path $latestFile
   if ((Get-ChildItem -Path (Split-Path -Path $latestFile) | Measure-Object).Count -eq 0) {
     Remove-Item -Path (Split-Path -Path $latestFile)
