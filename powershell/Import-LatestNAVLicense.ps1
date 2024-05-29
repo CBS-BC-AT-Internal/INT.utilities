@@ -33,6 +33,22 @@ enum PathType {
   URL
 }
 
+function CheckCommands() {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string[]]$commands
+  )
+  try {
+    $commands | ForEach-Object {
+      Get-Command -Name $_ -ErrorAction Stop | Out-Null
+    }
+  }
+  catch {
+    return $false
+  }
+  return $true
+}
+
 function Initialize-Modules() {
   param(
     [Parameter(Mandatory = $true)]
@@ -145,11 +161,17 @@ function GetLatestLicenseFile() {
 }
 
 $ErrorActionPreference = 'Stop'
+$commands = @(
+  'Import-NAVServerLicense'
+)
+
+if (-not (CheckCommands -commands $commands)) {
+  Initialize-Modules -runAsJob:$runAsJob -bcVersion $bcVersion -modulePath $modulePath
+}
 
 $licenseFiles = GetLicenseFiles -licensePath $licensePath -fileEnding $fileEnding
 $latestFile = GetLatestLicenseFile -licenseFiles $licenseFiles
 
-Initialize-Modules -runAsJob:$runAsJob -bcVersion $bcVersion -modulePath $modulePath
 Write-Host "Importing license file '$latestFile' to '$serverInstance'..."
 Import-NAVServerLicense -ServerInstance $serverInstance -LicenseFile $latestFile
 

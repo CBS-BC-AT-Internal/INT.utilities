@@ -33,6 +33,22 @@ param(
     [switch] $runAsJob
 )
 
+function CheckCommands() {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$commands
+    )
+    try {
+        $commands | ForEach-Object {
+            Get-Command -Name $_ -ErrorAction Stop | Out-Null
+        }
+    }
+    catch {
+        return $false
+    }
+    return $true
+}
+
 function Initialize-Modules() {
     param(
         [Parameter(Mandatory = $false)]
@@ -317,7 +333,18 @@ function Sync-App() {
 # === End of functions ===
 
 $ErrorActionPreference = "Stop"
-Initialize-Modules -bcVersion $bcVersion -modulePath $modulePath -runAsJob:$runAsJob
+$commands = @(
+    'Install-NAVApp',
+    'Uninstall-NAVApp',
+    'Publish-NAVApp',
+    'Sync-NAVApp',
+    'Start-NAVAppDataUpgrade',
+    'Unpublish-NAVApp'
+)
+
+if (-not (CheckCommands -commands $commands)) {
+    Initialize-Modules -runAsJob:$runAsJob -bcVersion $bcVersion -modulePath $modulePath
+}
 $style = Initialize-ColorStyle -showColorKey $showColorKey
 
 $appPath = Test-AppPath -appPath $appPath
