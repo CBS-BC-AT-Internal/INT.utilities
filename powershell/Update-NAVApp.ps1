@@ -395,12 +395,14 @@ if ($sameVersion) {
 else {
     Write-Host "Publish-NAVApp -ServerInstance $srvInst -Path $appPath -SkipVerification -PackageType Extension" -ForegroundColor $style.Command
     Publish-NAVApp -ServerInstance $srvInst -Path $appPath -SkipVerification -PackageType Extension
-    Write-Host "Sync-NAVApp -ServerInstance $srvInst -Name $newAppName -Version $newVersionString -ForceSync $ForceSync" -ForegroundColor $style.Command
     Sync-App -srvInst $srvInst -appInfo $newAppInfo -ForceSync $ForceSync
 
     if ($oldAppExists) {
         Write-Host "Start-NAVAppDataUpgrade -ServerInstance $srvInst -Name $newAppName -Version $newVersionString" -ForegroundColor $style.Command
         Start-NAVAppDataUpgrade -ServerInstance $srvInst -Name $newAppName -Version $newVersion
+    }
+    else {
+        Install-App -srvInst $srvInst -appInfo $newAppInfo
     }
 }
 
