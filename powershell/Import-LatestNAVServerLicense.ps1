@@ -51,12 +51,12 @@ function CheckCommands() {
 
 function Initialize-Modules() {
     param(
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $false)]
         [string] $bcVersion,
         [ValidateScript({ if (![string]::IsNullOrEmpty($_)) { Test-Path $_ -PathType Leaf } else { $true } })]
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $false)]
         [string] $modulePath,
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $false)]
         [switch] $runAsJob
     )
 
@@ -99,6 +99,7 @@ function DownloadLicenseFile() {
     param(
         [Parameter(Mandatory = $true)]
         [string]$licensePath,
+        [Parameter(Mandatory = $false)]
         [string]$outputPath = "$PWD/_temp"
     )
     $licenseFileName = $licensePath.Substring($licensePath.LastIndexOf('/') + 1)

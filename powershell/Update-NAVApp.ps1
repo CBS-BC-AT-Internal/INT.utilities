@@ -19,10 +19,10 @@
 ##  & Install-NAVApp.ps1 -srvInst "BC14-DEV" -appPath "C:\BC\apps\Cronus_MyApp_1.0.1.3.app" #-ForceSync
 
 param(
-    [parameter(mandatory = $true, position = 0)]
+    [parameter(Mandatory = $true, position = 0)]
     [ValidateNotNullOrEmpty()]
     [string] $srvInst,
-    [parameter(mandatory = $true)]
+    [parameter(Mandatory = $true)]
     [ValidateScript({ Test-Path $_ -PathType Leaf })]
     [string] $appPath,
     [switch] $ForceSync,
@@ -97,6 +97,7 @@ function Get-AppId() {
 
 function Initialize-ColorStyle() {
     param (
+        [Parameter(Mandatory = $false)]
         [bool] $showColorKey = $false
     )
     $style = @{
@@ -124,6 +125,7 @@ function Initialize-ColorStyle() {
 
 function Test-AppPath() {
     param(
+        [Parameter(Mandatory = $true)]
         [string] $appPath
     )
 
@@ -139,6 +141,7 @@ function Test-AppPath() {
 
 function Initialize-AppList() {
     param (
+        [Parameter(Mandatory = $true)]
         [string] $srvInst
     )
     $appList = @{}
@@ -169,7 +172,9 @@ function Get-NewestPublishedAppVersion() {
 
 function Remove-AppFromDependentList() {
     param(
+        [Parameter(Mandatory = $true)]
         [System.Guid] $appId,
+        [Parameter(Mandatory = $true)]
         [hashtable] $appList
     )
 
@@ -191,6 +196,7 @@ function Get-DependentAppList() {
         [System.Guid] $appId,
         [Parameter(Mandatory = $true)]
         [string] $srvInst,
+        [Parameter(Mandatory = $false)]
         [hashtable] $appList
     )
     $depList = @{}
@@ -230,6 +236,7 @@ function Install-App() {
     param (
         [Parameter(Mandatory = $true)]
         $appInfo,
+        [Parameter(Mandatory = $true)]
         [string] $srvInst
     )
     if ($null -eq $appInfo) {
@@ -243,7 +250,9 @@ function Install-App() {
 
 function Uninstall-App() {
     param (
+        [Parameter(Mandatory = $true)]
         [string] $srvInst,
+        [Parameter(Mandatory = $true)]
         $appInfo
     )
     $appName = $appInfo.Name
@@ -256,6 +265,7 @@ function Unpublish-OldNAVApp() {
     param(
         [Parameter(Mandatory = $true)]
         $appInfo,
+        [Parameter(Mandatory = $true)]
         [string] $srvInst
     )
     if ($null -eq $appInfo) {
@@ -270,7 +280,9 @@ function Unpublish-OldNAVApp() {
 
 function Unpublish-NAVApps() {
     param(
+        [Parameter(Mandatory = $true)]
         [string] $srvInst,
+        [Parameter(Mandatory = $true)]
         [array] $apps
     )
     Write-Verbose "Unpublishing the following apps:"
@@ -285,6 +297,7 @@ function Unpublish-OldVersions() {
     param(
         [Parameter(Mandatory = $true)]
         $appInfo,
+        [Parameter(Mandatory = $true)]
         [string] $srvInst
     )
     if ($null -eq $appInfo) {
@@ -306,7 +319,9 @@ function Sync-App() {
     param (
         [Parameter(Mandatory = $true)]
         $appInfo,
+        [Parameter(Mandatory = $true)]
         [string] $srvInst,
+        [Parameter(Mandatory = $false)]
         [bool] $ForceSync
     )
     if ($null -eq $appInfo) {
