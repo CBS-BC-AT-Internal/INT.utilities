@@ -13,10 +13,7 @@
 ##  +) All dependent apps will be installed again.
 ##
 ##  ===  Example usage  ============================
-##  For terminal use:
-##  Install-NAVApp.ps1 BC14-DEV -appPath "apps\Cronus_MyApp_1.0.1.3.app"
-##  For .ps1 use:
-##  & Install-NAVApp.ps1 -srvInst "BC14-DEV" -appPath "C:\BC\apps\Cronus_MyApp_1.0.1.3.app" #-ForceSync
+##  Update-NAVApp.ps1 BC14-DEV -appPath "apps\Cronus_MyApp_1.0.1.3.app"
 
 param(
     [parameter(Mandatory = $true, position = 0)]
@@ -27,6 +24,7 @@ param(
     [string] $appPath,
     [switch] $ForceSync,
     [string] $bcVersion,
+    [string] $folderVersion,
     [ValidateScript({ if (![string]::IsNullOrEmpty($_)) { Test-Path $_ -PathType Leaf } else { $true } })]
     [string] $modulePath,
     [switch] $showColorKey,
@@ -49,10 +47,85 @@ function CheckCommands() {
     return $true
 }
 
+function Test-ServerConfiguration() {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$serverInstance
+    )
+
+    Get-Command -Name 'Get-NAVServerConfiguration' -ErrorAction Stop | Out-Null
+    $serverConfigArray = Get-NAVServerConfiguration -ServerInstance $serverInstance
+    $serverConfig = @{}
+    $serverConfigArray | ForEach-Object {
+        $serverConfig[$_.key] = $_.value
+    }
+
+    # Use this list to validate any server configuration settings
+    $checkList = @{
+        'ManagementApiServicesEnabled' = $true
+    }
+
+    $checkList | ForEach-Object {
+        $property = $_.Key
+        $value = $_.Value
+        if ($serverConfig[$property] -ne $value) {
+            Write-Host "The server instance '$serverInstance' is not configured correctly. The property '$property' must be set to '$value'." -ForegroundColor $style.Error
+            exit 1
+        }
+    }
+}
+
+function Test-ForMultipleVersions(){
+    $params = @{
+        navModuleName    = 'Microsoft.Dynamics.Nav.Management.psm1'
+        navModuleDllName = 'Microsoft.Dynamics.Nav.Management.dll'
+    }
+    $mgtModules = Get-NAVModuleVersions @params
+
+    if ($mgtModules -is [array] -and $mgtModules.Count -gt 1) {
+        Write-Host 'Multiple versions of NAV Management module found. Please specify the version using the "bcVersion" parameter.' -ForegroundColor $style.Error
+        Write-Host 'Available versions:' -ForegroundColor $style.Info
+        $mgtModules | ForEach-Object {
+            Write-Host "- $($_.VersionNo)" -ForegroundColor $style.Info
+        }
+        exit 1
+    }
+}
+
+function ImportNAVModules() {
+    param(
+        [Parameter(Mandatory = $false)]
+        [string] $bcVersion,
+        [Parameter(Mandatory = $false)]
+        [switch] $runAsJob
+    )
+
+    $cloudReadyModule = 'Cloud.Ready.Software.NAV'
+    if (!(Get-Module -ListAvailable -Name $cloudReadyModule)) {
+        Write-Host "$cloudReadyModule module is missing. Installing the module..." -ForegroundColor $style.Warning
+        Install-Module -Name $cloudReadyModule -Force -Scope CurrentUser
+    }
+
+    if ([string]::IsNullOrEmpty($bcVersion)) {
+        Test-ForMultipleVersions -bcVersion $bcVersion
+    }
+
+    $params = @{
+        WarningAction = 'SilentlyContinue'
+        RunAsJob      = $runAsJob
+    }
+    if ($bcVersion) {
+        $params.Add('navVersion', $bcVersion)
+    }
+    Import-NAVModules @params
+}
+
 function Initialize-Modules() {
     param(
         [Parameter(Mandatory = $false)]
         [string] $bcVersion,
+        [Parameter(Mandatory = $false)]
+        [string] $folderVersion,
         [ValidateScript({ if (![string]::IsNullOrEmpty($_)) { Test-Path $_ -PathType Leaf } else { $true } })]
         [Parameter(Mandatory = $false)]
         [string] $modulePath,
@@ -60,16 +133,12 @@ function Initialize-Modules() {
         [switch] $runAsJob
     )
 
-    if ([string]::IsNullOrEmpty($modulePath) -and ![string]::IsNullOrEmpty($bcVersion)) {
-        $modulePath = "C:\Program Files\Microsoft Dynamics 365 Business Central\$bcVersion\Service\NavAdminTool.ps1"
+    if ([string]::IsNullOrEmpty($modulePath) -and ![string]::IsNullOrEmpty($folderVersion)) {
+        $modulePath = "C:\Program Files\Microsoft Dynamics 365 Business Central\$folderVersion\Service\NavAdminTool.ps1"
     }
 
     if ([string]::IsNullOrEmpty($modulePath)) {
-        if (!(Get-Module -ListAvailable -Name 'Cloud.Ready.Software.NAV')) {
-            Write-Host 'Cloud.Ready.Sofware.NAV module is missing. Installing the module...' -ForegroundColor Yellow
-            Install-Module -Name 'Cloud.Ready.Software.NAV' -Force -Scope CurrentUser
-        }
-        Import-NAVModules -WarningAction SilentlyContinue -RunAsJob:$runAsJob
+        ImportNAVModules -bcVersion $bcVersion -runAsJob $runAsJob
     }
     else {
         Import-Module $modulePath
@@ -358,9 +427,11 @@ $commands = @(
 )
 
 if (-not (CheckCommands -commands $commands)) {
-    Initialize-Modules -runAsJob:$runAsJob -bcVersion $bcVersion -modulePath $modulePath
+    Initialize-Modules -runAsJob:$runAsJob -bcVersion $bcVersion -modulePath $modulePath -folderVersion $folderVersion
 }
 $style = Initialize-ColorStyle -showColorKey $showColorKey
+
+Test-ServerConfiguration -serverInstance $srvInst
 
 $appPath = Test-AppPath -appPath $appPath
 
