@@ -138,7 +138,11 @@ function Initialize-Modules() {
     }
 
     if ([string]::IsNullOrEmpty($modulePath)) {
-        ImportNAVModules -bcVersion $bcVersion -runAsJob $runAsJob
+        $params = @{
+            bcVersion = $bcVersion
+            runAsJob  = $runAsJob
+        }
+        ImportNAVModules @params
     }
     else {
         Import-Module $modulePath
