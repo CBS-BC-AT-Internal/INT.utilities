@@ -65,7 +65,7 @@ function Test-ServerConfiguration() {
         'ManagementApiServicesEnabled' = $true
     }
 
-    $checkList | ForEach-Object {
+    $checkList.GetEnumerator() | ForEach-Object {
         $property = $_.Key
         $value = $_.Value
         if ($serverConfig[$property] -ne $value) {
