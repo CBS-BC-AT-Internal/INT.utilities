@@ -62,13 +62,17 @@ function Test-ServerConfiguration() {
 
     # Use this list to validate any server configuration settings
     $checkList = @{
-        'ManagementApiServicesEnabled' = $true
+        'ManagementApiServicesEnabled' = $true  # Not available in BC14
     }
 
     $checkList.GetEnumerator() | ForEach-Object {
         $property = $_.Key
         $value = $_.Value
-        if ($serverConfig[$property] -ne $value) {
+        if (-not $serverConfig.ContainsKey($property)){
+            continue
+        }
+        $serverValue = [convert]::ChangeType($serverConfig[$property], $value.GetType())
+        if ($serverValue -ne $value) {
             Write-Host "The server instance '$serverInstance' is not configured correctly. The property '$property' must be set to '$value'." -ForegroundColor $style.Error
             exit 1
         }
