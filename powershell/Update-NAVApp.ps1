@@ -69,7 +69,7 @@ function Test-ServerConfiguration() {
         $property = $_.Key
         $value = $_.Value
         if (-not $serverConfig.ContainsKey($property)){
-            continue
+            return
         }
         $serverValue = [convert]::ChangeType($serverConfig[$property], $value.GetType())
         if ($serverValue -ne $value) {
@@ -288,8 +288,8 @@ function Get-DependentAppList() {
     }
 
     foreach ($appKey in $appList.Keys) {
-        if ($depList.ContainsKey($appKey)) { continue }
-        if (!($appList.ContainsKey($appKey))) { continue }
+        if ($depList.ContainsKey($appKey)) { return }
+        if (!($appList.ContainsKey($appKey))) { return }
 
         $appInfo = $appList[$appKey]
         $appName = $appInfo.Name
@@ -297,7 +297,7 @@ function Get-DependentAppList() {
         foreach ($dep in $appInfo.Dependencies) {
             Write-Verbose "- $dep"
         }
-        if ($null -eq $appInfo.Dependencies) { continue }
+        if ($null -eq $appInfo.Dependencies) { return }
         [System.Guid[]] $appDependencies = $appInfo.Dependencies | ForEach-Object { Get-AppId $_ }
         if ($appDependencies -contains $appId) {
             $appList.Remove($appKey)
