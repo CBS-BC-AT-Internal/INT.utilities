@@ -45,8 +45,8 @@
 .PARAMETER ForceSync
     Switch parameter to force synchronization during the update process.
 
-.PARAMETER dry
-    Specifies whether to run the script without executing the update script.
+.PARAMETER dryRun
+    Specifies whether to run the script without writing any changes to the system.
     Used for testing purposes. Default value is "$False".
 
 .EXAMPLE
@@ -77,7 +77,7 @@ param (
     [string]$appPath,
     [string]$scriptURI = "https://raw.githubusercontent.com/CBS-BC-AT-Internal/INT.utilities/v0.2.18/powershell/Update-NAVApp.ps1",
     [switch]$ForceSync,
-    [switch]$dry = $False
+    [switch]$dryRun = $False
 )
 
 function Read-Input {
@@ -126,7 +126,7 @@ function Get-OrDownloadFile {
         Invoke-WebRequest -Uri $scriptURI -OutFile $filePath
     }
     else {
-        if(-not [System.IO.Path]::IsPathRooted($fileURI)){
+        if (-not [System.IO.Path]::IsPathRooted($fileURI)) {
             $fileURI = Join-Path $PSScriptRoot $fileURI -Resolve
         }
         $filePath = $fileURI
@@ -176,7 +176,8 @@ if (-not $server) {
     if ($PSVersionTable.PSVersion.Major -le 5) {
         $servers = @{}
         $config.servers.PSObject.Properties | ForEach-Object { $servers[$_.Name] = $_.Value }
-    } else {
+    }
+    else {
         $servers = $config.servers
     }
     $serverKeys = $servers.Keys
@@ -235,19 +236,21 @@ $parameters = @{
     appPath = $appPath
 }
 
-if($ForceSync){
+if ($ForceSync) {
     $parameters["ForceSync"] = $ForceSync
 }
 
-if($bcVersion){
+if ($bcVersion) {
     $parameters["bcVersion"] = $bcVersion
+}
+
+if ($dryRun) {
+    $parameters["dryRun"] = $dryRun
 }
 
 # Execute the script
 Write-Host $scriptPath @parameters
-if (-not $dry) {
-    & $scriptPath @parameters
-}
+& $scriptPath @parameters
 
 # Remove the temporary files
 if (Test-Path -Path $tempFolder) {

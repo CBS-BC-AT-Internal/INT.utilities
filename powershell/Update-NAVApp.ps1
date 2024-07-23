@@ -28,7 +28,8 @@ param(
     [ValidateScript({ if (![string]::IsNullOrEmpty($_)) { Test-Path $_ -PathType Leaf } else { $true } })]
     [string] $modulePath,
     [switch] $showColorKey,
-    [switch] $runAsJob
+    [switch] $runAsJob,
+    [switch] $dryRun
 )
 
 function CheckCommands() {
@@ -182,7 +183,7 @@ function Initialize-ColorStyle() {
         Finished = "Green"
         Info     = "White"
         Success  = "Cyan"
-        Warning  = "Magenta"
+        Warning  = "Yellow"
         Command  = "Gray"
     }
 
@@ -333,7 +334,9 @@ function Install-App() {
     $appName = $appInfo.Name
     $appVersion = $appInfo.Version
     Write-Host "Install-NAVApp -ServerInstance $srvInst -Name $appName -Version $($appVersion -join '.')" -ForegroundColor $style.Command
-    Install-NAVApp -ServerInstance $srvInst -Name $appName -Version $appVersion
+    if (-not $dryRun) {
+        Install-NAVApp -ServerInstance $srvInst -Name $appName -Version $appVersion
+    }
 }
 
 function Uninstall-App() {
@@ -346,7 +349,9 @@ function Uninstall-App() {
     $appName = $appInfo.Name
     $appVersion = $appInfo.Version
     Write-Verbose "Uninstall-NAVApp -ServerInstance $srvInst -Name $appName -Version $($appVersion -join '.')"
-    Uninstall-NAVApp -ServerInstance $srvInst -Name $appName -Version $appVersion
+    if (-not $dryRun) {
+        Uninstall-NAVApp -ServerInstance $srvInst -Name $appName -Version $appVersion
+    }
 }
 
 function Unpublish-OldNAVApp() {
@@ -362,7 +367,9 @@ function Unpublish-OldNAVApp() {
     $appName = $appInfo.Name
     $appVersion = $appInfo.Version -join '.'
     Write-Host "Unpublish-NAVApp -ServerInstance $srvInst -Name $appName -Version $appVersion" -ForegroundColor $style.Command
-    Unpublish-NAVApp -ServerInstance $srvInst -Name $appName -Version $appVersion
+    if (-not $dryRun) {
+        Unpublish-NAVApp -ServerInstance $srvInst -Name $appName -Version $appVersion
+    }
     Write-Host "Unpublished $appName $appVersion." -ForegroundColor $style.Info
 }
 
@@ -430,7 +437,9 @@ function Sync-App() {
     }
 
     Write-Host $commandString -ForegroundColor $style.Command
-    Sync-NAVApp @syncParams
+    if (-not $dryRun) {
+        Sync-NAVApp @syncParams
+    }
 }
 
 # === End of functions ===
@@ -444,6 +453,12 @@ $commands = @(
     'Start-NAVAppDataUpgrade',
     'Unpublish-NAVApp'
 )
+
+$style = Initialize-ColorStyle -showColorKey $showColorKey
+
+if ($dryRun) {
+    Write-Host "Running in dry-run mode. No changes will be made." -ForegroundColor $style.Warning
+}
 
 if (-not (CheckCommands -commands $commands)) {
     Initialize-Modules -runAsJob:$runAsJob -bcVersion $bcVersion -modulePath $modulePath -folderVersion $folderVersion
@@ -498,12 +513,16 @@ if ($sameVersion) {
 }
 else {
     Write-Host "Publish-NAVApp -ServerInstance $srvInst -Path $appPath -SkipVerification -PackageType Extension" -ForegroundColor $style.Command
-    Publish-NAVApp -ServerInstance $srvInst -Path $appPath -SkipVerification -PackageType Extension
-    Sync-App -srvInst $srvInst -appInfo $newAppInfo -ForceSync $ForceSync
+    if (-not $dryRun) {
+        Publish-NAVApp -ServerInstance $srvInst -Path $appPath -SkipVerification -PackageType Extension
+        Sync-App -srvInst $srvInst -appInfo $newAppInfo -ForceSync $ForceSync
+    }
 
     if ($oldAppExists) {
         Write-Host "Start-NAVAppDataUpgrade -ServerInstance $srvInst -Name $newAppName -Version $newVersionString" -ForegroundColor $style.Command
-        Start-NAVAppDataUpgrade -ServerInstance $srvInst -Name $newAppName -Version $newVersion
+        if (-not $dryRun) {
+            Start-NAVAppDataUpgrade -ServerInstance $srvInst -Name $newAppName -Version $newVersion
+        }
     }
     else {
         Install-App -srvInst $srvInst -appInfo $newAppInfo
