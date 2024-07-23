@@ -425,6 +425,8 @@ function Sync-App() {
 # === End of functions ===
 
 $ErrorActionPreference = "Stop"
+$style = Initialize-ColorStyle -showColorKey $showColorKey
+
 $commands = @(
     'Install-NAVApp',
     'Uninstall-NAVApp',
@@ -437,7 +439,6 @@ $commands = @(
 if (-not (CheckCommands -commands $commands)) {
     Initialize-Modules -runAsJob:$runAsJob -bcVersion $bcVersion -modulePath $modulePath -folderVersion $folderVersion
 }
-$style = Initialize-ColorStyle -showColorKey $showColorKey
 
 Test-ServerConfiguration -serverInstance $srvInst
 
