@@ -68,7 +68,7 @@ function Test-ServerConfiguration() {
     $checkList.GetEnumerator() | ForEach-Object {
         $property = $_.Key
         $value = $_.Value
-        if (-not $serverConfig.ContainsKey($property)){
+        if (-not $serverConfig.ContainsKey($property)) {
             return
         }
         $serverValue = [convert]::ChangeType($serverConfig[$property], $value.GetType())
@@ -79,7 +79,7 @@ function Test-ServerConfiguration() {
     }
 }
 
-function Test-ForMultipleVersions(){
+function Test-ForMultipleVersions() {
     $params = @{
         navModuleName    = 'Microsoft.Dynamics.Nav.Management.psm1'
         navModuleDllName = 'Microsoft.Dynamics.Nav.Management.dll'
@@ -287,26 +287,37 @@ function Get-DependentAppList() {
         $appList = Remove-AppFromDependentList -appId $appId -appList $appList
     }
 
+    $appListPruned = $appList.Clone()
     foreach ($appKey in $appList.Keys) {
-        if ($depList.ContainsKey($appKey)) { return }
-        if (!($appList.ContainsKey($appKey))) { return }
+        if ($depList.ContainsKey($appKey)) {
+            $appListPruned.Remove($appKey)
+            continue
+        }
+        if (!($appListPruned.ContainsKey($appKey))) { continue }
 
         $appInfo = $appList[$appKey]
         $appName = $appInfo.Name
         Write-Verbose "Checking dependencies of $appName..."
+        if ($null -eq $appInfo.Dependencies) {
+            Write-Verbose "  None found."
+            $appListPruned.Remove($appKey)
+            continue
+        }
         foreach ($dep in $appInfo.Dependencies) {
             Write-Verbose "- $dep"
         }
-        if ($null -eq $appInfo.Dependencies) { return }
         [System.Guid[]] $appDependencies = $appInfo.Dependencies | ForEach-Object { Get-AppId $_ }
         if ($appDependencies -contains $appId) {
-            $appList.Remove($appKey)
-            Write-Host "Dependent found: $appName Version ${appInfo.Version}"
+            $appListPruned.Remove($appKey)
+            Write-Host "- $appName Version $($appInfo.Version)"
             $depList[$appKey] = $appInfo
-            $depList += Get-DependentAppList -appId $appKey -appList $appList
+            $depListPrime, $appListPruned = Get-DependentAppList -appId $appKey -srvInst $srvInst -appList $appListPruned
+            if ($depListPrime) {
+                $depList += $depListPrime
+            }
         }
     }
-    return $depList
+    return $depList, $appListPruned
 }
 
 function Install-App() {
@@ -425,8 +436,6 @@ function Sync-App() {
 # === End of functions ===
 
 $ErrorActionPreference = "Stop"
-$style = Initialize-ColorStyle -showColorKey $showColorKey
-
 $commands = @(
     'Install-NAVApp',
     'Uninstall-NAVApp',
@@ -469,13 +478,13 @@ if ($sameVersion) {
 
 if ($oldAppExists) {
     Write-Host "Searching for apps depending on $newAppName..." -ForegroundColor $style.Info
-    $dependentList = Get-DependentAppList -appId $newAppId -srvInst $srvInst
+    $dependentList, $dummyList = Get-DependentAppList -appId $newAppId -srvInst $srvInst
 
     if ($dependentList.Count -gt 0) {
-        Write-Host "Found a total of ${dependentList.Count} dependent apps." -ForegroundColor $style.Success
+        Write-Host "Found a total of $($dependentList.Count) dependent apps." -ForegroundColor $style.Success
         foreach ($depAppKey in $dependentList.Keys) {
             $depAppInfo = $dependentList[$depAppKey]
-            Write-Host "Uninstalling dependent app ${depAppInfo.Name}..." -ForegroundColor $style.Info
+            Write-Host "Uninstalling dependent app $($depAppInfo.Name)..." -ForegroundColor $style.Info
             Uninstall-App -srvInst $srvInst -appInfo $depAppInfo
         }
     }
