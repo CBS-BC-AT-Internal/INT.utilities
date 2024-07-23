@@ -40,7 +40,7 @@
 .PARAMETER scriptURI
     Specifies the path to the update script. May be a path to a local file or a
     URL. Default value is
-    "https://raw.githubusercontent.com/CBS-BC-AT-Internal/INT.utilities/main/powershell/Install-NAVApp.ps1".
+    "https://raw.githubusercontent.com/CBS-BC-AT-Internal/INT.utilities/v0.2.18/powershell/Update-NAVApp.ps1".
 
 .PARAMETER ForceSync
     Switch parameter to force synchronization during the update process.
@@ -75,7 +75,7 @@ param (
     [string]$appName,
     [string]$appVersion = "*",
     [string]$appPath,
-    [string]$scriptURI = "https://raw.githubusercontent.com/CBS-BC-AT-Internal/INT.utilities/v0.2.0/powershell/Install-NAVApp.ps1",
+    [string]$scriptURI = "https://raw.githubusercontent.com/CBS-BC-AT-Internal/INT.utilities/v0.2.18/powershell/Update-NAVApp.ps1",
     [switch]$ForceSync,
     [switch]$dry = $False
 )
@@ -126,7 +126,10 @@ function Get-OrDownloadFile {
         Invoke-WebRequest -Uri $scriptURI -OutFile $filePath
     }
     else {
-        $filePath = [System.IO.Path]::GetFullPath($fileURI)
+        if(-not [System.IO.Path]::IsPathRooted($fileURI)){
+            $fileURI = Join-Path $PSScriptRoot $fileURI -Resolve
+        }
+        $filePath = $fileURI
     }
 
     if (-not (Test-Path -Path $filePath)) {
@@ -146,7 +149,7 @@ $configFile = Get-Content -Path $configPath -Raw
 # ConvertFrom-Json -AsHashtable is not available in PowerShell 5
 if ($PSVersionTable.PSVersion.Major -le 5) {
     $config = @{}
-    (ConvertFrom-Json $configFile).psobject.properties | ForEach-Object { $config[$_.Name] = $_.Value }
+    (ConvertFrom-Json $configFile).PSObject.Properties | ForEach-Object { $config[$_.Name] = $_.Value }
 }
 else {
     $config = ConvertFrom-Json -AsHashtable $configFile
@@ -170,7 +173,12 @@ $bcVersion = $config["bcVersion"]
 
 # Get the server instance
 if (-not $server) {
-    $servers = $config.servers
+    if ($PSVersionTable.PSVersion.Major -le 5) {
+        $servers = @{}
+        $config.servers.PSObject.Properties | ForEach-Object { $servers[$_.Name] = $_.Value }
+    } else {
+        $servers = $config.servers
+    }
     $serverKeys = $servers.Keys
     if (-not $servers -or -not $serverKeys) {
         $server = Read-Input -prompt "server instance"
@@ -183,7 +191,7 @@ if (-not $server) {
             $selection = Read-Input -prompt "Please select a server" -options $serverKeys
         }
 
-        $server = $servers.$selection
+        [string]$server = $servers[$selection]
     }
 }
 
