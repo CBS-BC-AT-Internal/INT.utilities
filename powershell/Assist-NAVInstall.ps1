@@ -166,6 +166,8 @@ if (-not $appName) {
     $appName = Get-ConfigValue "appName"
 }
 
+$bcVersion = $config["bcVersion"]
+
 # Get the server instance
 if (-not $server) {
     $servers = $config.servers
@@ -220,9 +222,23 @@ Write-Host "Server: $server"
 Write-Host "Application: $appPath"
 Write-Host "Script: $scriptPath"
 
-# Execute the script, if not in dry mode
+$parameters = @{
+    srvInst = $server
+    appPath = $appPath
+}
+
+if($ForceSync){
+    $parameters["ForceSync"] = $ForceSync
+}
+
+if($bcVersion){
+    $parameters["bcVersion"] = $bcVersion
+}
+
+# Execute the script
+Write-Host $scriptPath @parameters
 if (-not $dry) {
-    & $scriptPath $server -appPath $appPath -ForceSync:$ForceSync
+    & $scriptPath @parameters
 }
 
 # Remove the temporary files
