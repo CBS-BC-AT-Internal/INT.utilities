@@ -94,18 +94,150 @@ function Read-Input {
     return Read-Host
 }
 
-function Get-ConfigValue {
+function Read-Option {
     param (
+        [Parameter(Mandatory = $true)]
+        [string]$prompt,
+        [string[]]$options
+    )
+    Write-Host "${prompt}:"
+    $options | ForEach-Object { $index = [Array]::IndexOf($options, $_); Write-Host "[$index] $_" }
+
+    while ($true) {
+        $selection = Read-Host "[0-$($options.Length)] or [q]uit"
+        $selection = $selection.Trim()
+        if ($selection -eq 'q' -or $selection -eq 'Q') {
+            Write-Error "User cancelled the operation."
+        }
+        elseif ($selection -match '^\d+$' -and $selection -ge 0 -and $selection -le $options.Length) {
+            return $selection
+        }
+        else {
+            Write-Host "Invalid selection. Please select a number between 0 and $($options.Length)."
+        }
+    }
+}
+
+function Select-Apps {
+    param(
         [Parameter(Position = 0, Mandatory = $true)]
-        [string]$key,
-        [string]$prompt = $key
+        $apps
+    )
+    $options = @("All")
+    $apps | ForEach-Object { $options += $_.name }
+
+    $selection = Read-Option -prompt "Please select an application to install" -options $options
+    if ($selection -eq 0) {
+        return $apps
+    }
+    else {
+        return $apps[$selection - 1]
+    }
+}
+
+function Get-Server {
+    param(
+        [Parameter(Position = 0, Mandatory = $true)]
+        $config
     )
 
-    if ($config.$key) {
-        return $config.$key
+    if ($PSVersionTable.PSVersion.Major -le 5) {
+        $servers = @{}
+        $config.servers.PSObject.Properties | ForEach-Object { $servers[$_.Name] = $_.Value }
+    }
+    else {
+        $servers = $config.servers
+    }
+    $serverKeys = $servers.Keys
+    if (-not $servers -or -not $serverKeys) {
+        return Read-Host "Please specify a server instance"
     }
 
-    return Read-Input -prompt $prompt
+    if ($serverKeys.Count -eq 1) {
+        $selection = $serverKeys[0]
+    }
+    else {
+        $selection = Read-Input -prompt "Please select a server" -options $serverKeys
+    }
+
+    return [string]$servers[$selection]
+}
+
+function Get-AppFiles {
+    param (
+        [Parameter(Position = 0, Mandatory = $true)]
+        [string]$name,
+        [Parameter(Position = 1, Mandatory = $true)]
+        [string]$folder,
+        [string]$version
+    )
+
+    if (-not $version) {
+        $version = "*"
+    }
+    $appFilename = "${name}_${version}.app"
+    $appFiles = Get-ChildItem -Path $folder -Filter $appFilename -Recurse -File |
+    Select-Object -ExpandProperty FullName
+
+    return $appFiles
+}
+
+function Get-NewestAppPath {
+    param (
+        [Parameter(Position = 0, Mandatory = $true)]
+        $appFiles,
+        [Parameter(Position = 1, Mandatory = $true)]
+        [string]$appName
+    )
+
+    $mostRecentVersion = $appFiles |
+    ForEach-Object { $_.Split("_")[-1].Trim(".app") } |
+    ForEach-Object { [version]$_ } |
+    Sort-Object -Descending |
+    Select-Object -First 1
+
+    $appFilename = "${appName}_${mostRecentVersion}.app"
+    return $appFiles | Where-Object { $_ -like "*$appFilename" }
+}
+
+function Get-AppPath {
+    param(
+        [Parameter(Position = 0, Mandatory = $true)]
+        $app
+    )
+    $appFiles = Get-AppFiles $app.name $app.folder -version $app.version
+    if (-not $appFiles) {
+        Write-Error "No application files found in the specified application folder."
+    }
+    if ($appFiles.Count -eq 1) {
+        return $appFiles[0]
+    }
+    else {
+        return Get-NewestAppPath $appFiles $app.name
+    }
+}
+
+function Get-AppsToInstall {
+    param(
+        [Parameter(Position = 0, Mandatory = $true)]
+        $config
+    )
+    $apps = @()
+    if ($config.apps) {
+        $config.apps | ForEach-Object { $apps += @{"name" = $_.name; "folder" = $_.folder; "version" = $_.version } }
+    }
+    else {
+        return Read-Host "Please specify the application file path"
+    }
+
+    if ($apps.Count -gt 1) {
+        $appsToInstall = Select-Apps $apps
+    }
+    else {
+        $appsToInstall = $apps
+    }
+
+    return $appsToInstall | ForEach-Object { Get-AppPath $_ }
 }
 
 function Get-OrDownloadFile {
@@ -140,10 +272,30 @@ function Get-OrDownloadFile {
     return $filePath
 }
 
+function Remove-TempFiles {
+    param (
+        [Parameter(Position = 0, Mandatory = $true)]
+        [string]$tempFolder
+    )
+
+    if (Test-Path -Path $tempFolder) {
+        Write-Host "Removing temporary files"
+        Remove-Item -Path $scriptPath
+
+        if (-not (Get-ChildItem -Path $tempFolder)) {
+            Remove-Item -Path $tempFolder
+        }
+    }
+}
+
+# === End of functions ===
+
+$ErrorActionPreference = "Stop"
+
 $tempFolder = "${PSScriptRoot}\Helper_Temp"
 
 # Load the config.json file
-$configPath = Get-OrDownloadFile -fileURI $configURI -tempFolder $tempFolder
+$configPath = Get-OrDownloadFile $configURI -tempFolder $tempFolder
 $configFile = Get-Content -Path $configPath -Raw
 
 # ConvertFrom-Json -AsHashtable is not available in PowerShell 5
@@ -159,107 +311,46 @@ else {
 Write-Host "Configuration:"
 $config | Format-List
 
-# Get the app folder path
-if (-not $appFolder) {
-    $appFolder = Get-ConfigValue "appFolder"
-}
-
-# Get the name of the app
-if (-not $appName) {
-    $appName = Get-ConfigValue "appName"
-}
-
 $bcVersion = $config["bcVersion"]
 
 # Get the server instance
 if (-not $server) {
-    if ($PSVersionTable.PSVersion.Major -le 5) {
-        $servers = @{}
-        $config.servers.PSObject.Properties | ForEach-Object { $servers[$_.Name] = $_.Value }
-    }
-    else {
-        $servers = $config.servers
-    }
-    $serverKeys = $servers.Keys
-    if (-not $servers -or -not $serverKeys) {
-        $server = Read-Input -prompt "server instance"
-    }
-    else {
-        if ($serverKeys.Count -eq 1) {
-            $selection = $serverKeys[0]
-        }
-        else {
-            $selection = Read-Input -prompt "Please select a server" -options $serverKeys
-        }
-
-        [string]$server = $servers[$selection]
-    }
+    $server = Get-Server $config
 }
 
-# Get the application file path
 if (-not $appPath) {
-    $appFilename = "${appName}_${appVersion}.app"
-    $appFiles = Get-ChildItem -Path $appFolder -Filter $appFilename -Recurse |
-    Select-Object -ExpandProperty FullName
-
-    if (-not $appFiles) {
-        Write-Error "No application files found in the specified application folder."
-        Exit
-    }
-
-    # Get the highest version number
-    $mostRecentVersion = $appFiles |
-    ForEach-Object { $_.Split("_")[-1].Trim(".app") } |
-    ForEach-Object { [version]$_ } |
-    Sort-Object -Descending |
-    Select-Object -First 1
-
-    $appFilename = "${appName}_${mostRecentVersion}.app"
-    $appPath = $appFiles | Where-Object { $_ -like "*$mostRecentVersion*" }
+    $appsToInstall = Get-AppsToInstall $config
 }
 else {
-    if (-not (Test-Path -Path $appPath)) {
-        Write-Error "The specified application file does not exist."
-        Exit
+    $appsToInstall = $appPath
+}
+
+$appsToInstall | ForEach-Object {
+    if (-not (Test-Path -Path $_)) {
+        Write-Error "The specified application file '$_' does not exist."
     }
 }
 
 # Download the install script if necessary
-$scriptPath = Get-OrDownloadFile -fileURI $scriptURI -tempFolder $tempFolder
-
-Write-Host "Server: $server"
-Write-Host "Application: $appPath"
+$scriptPath = Get-OrDownloadFile $scriptURI -tempFolder $tempFolder
 Write-Host "Script: $scriptPath"
+Write-Host "Server: $server"
 
 $parameters = @{
-    srvInst = $server
-    appPath = $appPath
-}
-
-if ($ForceSync) {
-    $parameters["ForceSync"] = $ForceSync
-}
-
-if ($bcVersion) {
-    $parameters["bcVersion"] = $bcVersion
-}
-
-if ($dryRun) {
-    $parameters["dryRun"] = $dryRun
+    srvInst   = $server
+    ForceSync = $ForceSync
+    bcVersion = $bcVersion
+    dryRun    = $dryRun
 }
 
 # Execute the script
-Write-Host $scriptPath @parameters
-& $scriptPath @parameters
-
-# Remove the temporary files
-if (Test-Path -Path $tempFolder) {
-    Write-Host "Removing temporary files"
-    Remove-Item -Path $scriptPath
-
-    if (-not (Get-ChildItem -Path $tempFolder)) {
-        Remove-Item -Path $tempFolder
-    }
+$appsToInstall | ForEach-Object {
+    $parameters["appPath"] = $_
+    Write-Host "Installing application '$_':"
+    Write-Host $scriptPath @parameters
+    & $scriptPath @parameters
 }
 
-Write-Host "Done"
+Remove-TempFiles $tempFolder
+
+Write-Host "Installation completed."
