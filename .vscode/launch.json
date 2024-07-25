@@ -9,9 +9,7 @@
       "args": [
         "-configURI",
         "${workspaceFolder}/test/Assist-NAVInstall/NAVInstall.config.json",
-        "-appFolder",
-        "${workspaceFolder}/test/Assist-NAVInstall",
-        "-dry"
+        "-dryRun"
       ]
     }
   ]

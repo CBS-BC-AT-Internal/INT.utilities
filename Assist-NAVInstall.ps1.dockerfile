@@ -10,4 +10,4 @@ COPY powershell/Assist-NAVInstall.ps1 .
 COPY test/Assist-NAVInstall C:/app/Assist-NAVInstall
 
 # Run the PowerShell script when the Docker container is started
-CMD ["powershell", "-File", "Assist-NAVInstall.ps1", "-appFolder", "Assist-NAVInstall", "-configURI", "Assist-NAVInstall/NAVInstall.config.json"]
+CMD ["powershell", "-File", "Assist-NAVInstall.ps1", "-configURI", "Assist-NAVInstall/NAVInstall.config.json"]

@@ -6,3 +6,4 @@
 - [Create-Container](docs/powershell/Create-Container.md)
 - [Find-StringInRepo](docs/powershell/Find-StringInRepo.md)
 - [Install-NAVApp](docs/powershell/Install-NAVApp.md)
+- [Assist-NAVInstall](docs/powershell/Assist-NAVInstall.md)

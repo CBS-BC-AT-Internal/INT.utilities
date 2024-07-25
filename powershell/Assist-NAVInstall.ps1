@@ -4,12 +4,12 @@
     of a given extension in a Business Central environment.
 
 .DESCRIPTION
-    This script checks if the a server instance is provided, and if not, it
-    assigns a default server instance based on the server parameter.
-    If a path to a specific application file is not provided, it searches for
-    the application file with the highest version number in the specified
-    application folder. Finally, it executes the Update-NAVApp.ps1 script with
-    the provided parameters.
+    This script deploys one or all applications defined in an configuration file
+    to a Business Central environment. Any information not provided in the
+    configuration file will be requested from the user.
+    Using the application name and folder provided, it automatically locates the
+    latest version for deployment. Finally, it retrieves and executes the update
+    script to publish and install the application in the environment.
 
 .PARAMETER configURI
     Specifies the path to the configuration file. Accepts filepaths and
@@ -18,19 +18,6 @@
 .PARAMETER server
     Specifies the server instance. If not provided, the user can choose between
     the server instances defined in the configuration file.
-
-.PARAMETER appFolder
-    Specifies the path to the application folder. If not provided, the script
-    will use the default application folder defined in the configuration file.
-
-.PARAMETER appName
-    Specifies the name of the application defined in the configuration file. If
-    not provided, the script will use the default application name defined in
-    the configuration file.
-
-.PARAMETER appVersion
-    Specifies the version of the application. Accepts wildcards such as 1.3.*.
-    Default value is "*".
 
 .PARAMETER appPath
     Specifies the path to the application file. If not provided, the script will
@@ -47,7 +34,7 @@
 
 .PARAMETER dryRun
     Specifies whether to run the script without writing any changes to the system.
-    Used for testing purposes. Default value is "$False".
+    Used for testing purposes.
 
 .EXAMPLE
     .\UpdateHelper.ps1 -server "BC-DEV1"
@@ -71,9 +58,6 @@ param (
     [Parameter(Position = 0)]
     [string]$configURI = "NAVInstall.config.json",
     [string]$server,
-    [string]$appFolder,
-    [string]$appName,
-    [string]$appVersion = "*",
     [string]$appPath,
     [string]$scriptURI = "https://raw.githubusercontent.com/CBS-BC-AT-Internal/INT.utilities/v0.2.18/powershell/Update-NAVApp.ps1",
     [switch]$ForceSync,

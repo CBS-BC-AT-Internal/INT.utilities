@@ -1,6 +1,10 @@
 {
-    "appName": "Sample_Extension",
-    "appFolder": "C:/app/apps",
+    "apps": [
+        {
+            "name": "Sample_Extension",
+            "folder": "C:/app/apps"
+        }
+    ],
     "servers":
     {
         "test": "bcserver"
