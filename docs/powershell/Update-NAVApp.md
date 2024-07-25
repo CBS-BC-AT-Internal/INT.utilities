@@ -1,4 +1,4 @@
-# Install-NAVApp.ps1
+# PowerShell Script Update-NAVApp.ps1
 
 This script is used to manage the lifecycle of a NAV App in a Business Central server instance.
 
