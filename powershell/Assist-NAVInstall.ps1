@@ -194,7 +194,7 @@ function Get-AppPath {
         Write-Error "No application files found in the specified application folder."
     }
     if ($appFiles.Count -eq 1) {
-        return $appFiles[0]
+        return $appFiles
     }
     else {
         return Get-NewestAppPath $appFiles $app.name
