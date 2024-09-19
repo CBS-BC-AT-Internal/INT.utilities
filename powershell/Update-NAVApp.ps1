@@ -117,6 +117,7 @@ function ImportNAVModules() {
 
     $params = @{
         WarningAction = 'SilentlyContinue'
+        ErrorAction   = 'SilentlyContinue'
         RunAsJob      = $runAsJob
     }
     if ($bcVersion) {
