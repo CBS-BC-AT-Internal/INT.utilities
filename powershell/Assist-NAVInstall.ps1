@@ -256,6 +256,57 @@ function Get-OrDownloadFile {
     return $filePath
 }
 
+function Get-ScriptParameters {
+    param (
+        [Parameter(Position = 0, Mandatory = $true)]
+        [string]$scriptPath
+    )
+
+    $scriptContent = Get-Content -Path $scriptPath
+    $parameters = $scriptContent | Select-String -Pattern "(?s)^\s*(?:#.*\r?\n)*\s*param\s*\(" -Context 0, 1 |
+    ForEach-Object { $_.Context.PostContext -replace "^\s*\[.*\]\s*([^\s]+)", '$1' }
+
+    return $parameters
+}
+
+function Get-ParameterHashtable {
+    param (
+        [Parameter(Position = 0, Mandatory = $true)]
+        [string]$parameters,
+        [Parameter(Position = 1, Mandatory = $true)]
+        $config
+    )
+    $parameterHashtable = @{}
+    $parameters | ForEach-Object {
+        if ($config.ContainsKey($_)) {
+            $parameterHashtable[$_] = $config[$_]
+        }
+    }
+
+    return $parameterHashtable
+}
+
+function Get-FinalParameters {
+    param (
+        [Parameter(Position = 0, Mandatory = $true)]
+        [string]$scriptPath,
+        [Parameter(Position = 1, Mandatory = $true)]
+        $config
+    )
+
+    $scriptParameters = Get-ScriptParameters $scriptPath
+    $parameters = Get-ParameterHashtable $scriptParameters $config
+    $overrideParameters = @{
+        srvInst   = $server
+        ForceSync = $ForceSync
+        dryRun    = $dryRun
+    }
+    $parameters += $overrideParameters
+
+    return $parameters
+}
+
+
 function Remove-TempFiles {
     param (
         [Parameter(Position = 0, Mandatory = $true)]
@@ -295,8 +346,6 @@ else {
 Write-Host "Configuration:"
 $config | Format-List
 
-$bcVersion = $config["bcVersion"]
-
 # Get the server instance
 if (-not $server) {
     $server = Get-Server $config
@@ -320,12 +369,7 @@ $scriptPath = Get-OrDownloadFile $scriptURI -tempFolder $tempFolder
 Write-Host "Script: $scriptPath"
 Write-Host "Server: $server"
 
-$parameters = @{
-    srvInst   = $server
-    ForceSync = $ForceSync
-    bcVersion = $bcVersion
-    dryRun    = $dryRun
-}
+$parameters = Get-FinalParameters $scriptPath $config
 
 # Execute the script
 $appsToInstall | ForEach-Object {
