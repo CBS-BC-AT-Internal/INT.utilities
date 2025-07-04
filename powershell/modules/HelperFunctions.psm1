@@ -412,4 +412,11 @@ function Get-SortedAppInfos {
     return $sortedAppInfos
 }
 
+# End of functions
+
+$functions = Select-String -Path $MyInvocation.MyCommand.Path -Pattern "^function\s+([^\s{$]+)" | ForEach-Object {
+    Write-Host "Function: $($_.Matches[0].Groups[1].Value)" -ForegroundColor DarkGray
+    $_.Matches[0].Groups[1].Value
+}
+Export-ModuleMember -Function $functions
 Write-HostTimed "Helper functions loaded." -ForegroundColor Cyan
