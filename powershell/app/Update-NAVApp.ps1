@@ -9,7 +9,8 @@ param(
     [ValidateSet("Add", "Clean", "Development", "ForceSync", "None")]
     [string]$SyncMode = "Add",
     $installedApps,
-    [string]$sortScriptPath = (Join-Path $PSScriptRoot "Get-NAVAppUninstallList.ps1"),
+    [string]$getAppsScriptPath = (Join-Path $PSScriptRoot "Get-NAVAppUninstallList.ps1"),
+    [string]$uninstallScriptPath = (Join-Path $PSScriptRoot "Uninstall-NAVAppList.ps1"),
     [switch]$DryRun
 )
 
@@ -111,17 +112,15 @@ $AppIdToUninstall = Get-AppIdFromAppFile -Appinfo $appToInstall
 
 # Step 3: Use Get-NAVAppUninstallList.ps1 to get the uninstall list
 Write-HostTimed "Generating uninstall list for AppId: $AppIdToUninstall..."
-$sortScriptPath = Convert-Path $sortScriptPath
-Write-Verbose "& $sortScriptPath -AppInfos [array] -ToUninstallAppId $AppIdToUninstall"
-[array]$uninstallList = & $sortScriptPath -AppInfos $installedApps -ToUninstallAppId $AppIdToUninstall -Verbose
+$getAppsScriptPath = Convert-Path $getAppsScriptPath
+Write-Verbose "& $getAppsScriptPath -AppInfos [array] -ToUninstallAppId $AppIdToUninstall"
+[array]$uninstallList = & $getAppsScriptPath -AppInfos $installedApps -ToUninstallAppId $AppIdToUninstall -Verbose
 
 # Step 4: Output the uninstall list
 Write-Host "Successfully generated uninstall list with $($uninstallList.Count) apps:"
 $uninstallList | ForEach-Object {
     Write-Host (Get-PrettyAppInfo -AppInfo $_ -bullet)
 }
-
-$uninstallScriptPath = (Join-Path $PSScriptRoot "Uninstall-NAVAppList.ps1")
 
 if (-not $DryRun) {
     if ($uninstallList.Count -gt 0) {
