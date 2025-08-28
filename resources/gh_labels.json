@@ -1,0 +1,82 @@
+[
+    {
+        "name": "CI/CD",
+        "color": "D6DBDF",
+        "description": "Changes to GitHub actions or configuration files"
+    },
+    {
+        "name": "Codeunit",
+        "color": "8E44AD"
+    },
+    {
+        "name": "Dependencies",
+        "color": "FDF2E9"
+    },
+    {
+        "name": "Enum",
+        "color": "FADBD8"
+    },
+    {
+        "name": "ForNAV",
+        "color": "D98880",
+        "description": "Changes to ForNAV report layouts or related files"
+    },
+    {
+        "name": "Not AL",
+        "color": "808B96",
+        "description": "Doesn't include changes to .al files"
+    },
+    {
+        "name": "Page",
+        "color": "3498DB"
+    },
+    {
+        "name": "PageExtension",
+        "color": "85C1E9"
+    },
+    {
+        "name": "PermissionSet",
+        "color": "B2BABB"
+    },
+    {
+        "name": "Query",
+        "color": "DC7633"
+    },
+    {
+        "name": "Release",
+        "color": "F4D03F",
+        "description": "Targets the default branch"
+    },
+    {
+        "name": "Report",
+        "color": "A3E4D7"
+    },
+    {
+        "name": "Rules",
+        "color": "EAF2F8",
+        "description": "Changes a custom ruleset configuration"
+    },
+    {
+        "name": "Table",
+        "color": "2ECC71"
+    },
+    {
+        "name": "TableExtension",
+        "color": "82E0AA"
+    },
+    {
+        "name": "Temporary",
+        "color": "D2A551",
+        "description": "Should be reverted at a certain point"
+    },
+    {
+        "name": "Testing",
+        "color": "FCF3CF",
+        "description": "Targets a test branch"
+    },
+    {
+        "name": "Translation",
+        "color": "F7F9F9",
+        "description": "Changes XLF files used for localization"
+    }
+]
