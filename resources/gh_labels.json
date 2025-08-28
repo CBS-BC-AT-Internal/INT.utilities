@@ -1,5 +1,10 @@
 [
     {
+        "name": "Automated",
+        "color": "CCCCCC",
+        "description": "Automated pull requests"
+    },
+    {
         "name": "CI/CD",
         "color": "D6DBDF",
         "description": "Changes to GitHub actions or configuration files"
@@ -9,17 +14,33 @@
         "color": "8E44AD"
     },
     {
+        "name": "ControlAddIn",
+        "color": "3A553F"
+    },
+    {
         "name": "Dependencies",
         "color": "FDF2E9"
+    },
+    {
+        "name": "DotNet",
+        "color": "653021"
     },
     {
         "name": "Enum",
         "color": "FADBD8"
     },
     {
+        "name": "EnumExtension",
+        "color": "FDE4E4"
+    },
+    {
         "name": "ForNAV",
         "color": "D98880",
         "description": "Changes to ForNAV report layouts or related files"
+    },
+    {
+        "name": "Interface",
+        "color": "775A95"
     },
     {
         "name": "Not AL",
@@ -35,8 +56,20 @@
         "color": "85C1E9"
     },
     {
+        "name": "PageCustomization",
+        "color": "D5DBDB"
+    },
+    {
         "name": "PermissionSet",
         "color": "B2BABB"
+    },
+    {
+        "name": "PermissionSetExt",
+        "color": "C0C6C9"
+    },
+    {
+        "name": "Profile",
+        "color": "7FB3D5"
     },
     {
         "name": "Query",
@@ -52,9 +85,25 @@
         "color": "A3E4D7"
     },
     {
+        "name": "ReportExtension",
+        "color": "C9F0E6"
+    },
+    {
+        "name": "RequestPage",
+        "color": "F5B7B1"
+    },
+    {
+        "name": "Resources",
+        "color": "550860"
+    },
+    {
         "name": "Rules",
         "color": "EAF2F8",
         "description": "Changes a custom ruleset configuration"
+    },
+    {
+        "name": "Scripts",
+        "color": "22AD57"
     },
     {
         "name": "Table",
@@ -78,5 +127,9 @@
         "name": "Translation",
         "color": "F7F9F9",
         "description": "Changes XLF files used for localization"
+    },
+    {
+        "name": "XMLPort",
+        "color": "FADBD8"
     }
 ]
