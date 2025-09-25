@@ -20,8 +20,8 @@ function Get-AppsToUnpublish {
     return $serverAppInfos | Where-Object {
         -not $_.IsInstalled -and
         $_.IsPublished -and
-        $_.SyncState -ne "Synced" -and
-        $_.ExtensionDataVersion.Value -gt $_.Version.Value
+        $_.SyncState -eq "Synced" -and
+        $_.ExtensionDataVersion -gt $_.Version
     }
 }
 

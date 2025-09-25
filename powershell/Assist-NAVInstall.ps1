@@ -29,8 +29,13 @@
     URL. Default value is
     "https://raw.githubusercontent.com/CBS-BC-AT-Internal/INT.utilities/v0.2.18/powershell/Update-NAVApp.ps1".
 
-.PARAMETER ForceSync
-    Switch parameter to force synchronization during the update process.
+.PARAMETER UninstallDependents
+    Switch parameter to uninstall dependent apps before installing the new app version.
+    Apps uninstalled this way will be reinstalled afterwards.
+
+.PARAMETER SyncMode
+    Specifies the synchronization mode to use during the update process.
+    Valid options are "Add", "Clean", "Development", "ForceSync", and "None".
 
 .PARAMETER dryRun
     Specifies whether to run the script without writing any changes to the system.
@@ -59,9 +64,11 @@ param (
     [string]$configURI = "NAVInstall.config.json",
     [string]$server,
     [string]$appPath,
-    [string]$scriptURI = "https://raw.githubusercontent.com/CBS-BC-AT-Internal/INT.utilities/v0.2.18/powershell/Update-NAVApp.ps1",
-    [switch]$ForceSync,
-    [switch]$dryRun = $False
+    [string]$scriptURI = "https://raw.githubusercontent.com/CBS-BC-AT-Internal/INT.utilities/v0.3.0/powershell/app/Update-NAVApp.ps1",
+    [switch]$UninstallDependents,
+    [ValidateSet("Add", "Clean", "Development", "ForceSync", "None")]
+    [string]$SyncMode = "Add",
+    [switch]$dryRun
 )
 
 function Read-Input {
@@ -262,11 +269,7 @@ function Get-ScriptParameters {
         [string]$scriptPath
     )
 
-    $scriptContent = Get-Content -Path $scriptPath
-    $parameters = $scriptContent | Select-String -Pattern "(?s)^\s*(?:#.*\r?\n)*\s*param\s*\(" -Context 0, 1 |
-    ForEach-Object { $_.Context.PostContext -replace "^\s*\[.*\]\s*([^\s]+)", '$1' }
-
-    return $parameters
+    return Get-Command -CommandInfo $scriptPath | Select-Object -ExpandProperty ParameterSets | Select-Object -ExpandProperty Parameters | ForEach-Object { $_.Name }
 }
 
 function Get-ParameterHashtable {
@@ -296,12 +299,23 @@ function Get-FinalParameters {
 
     $scriptParameters = Get-ScriptParameters $scriptPath
     $parameters = Get-ParameterHashtable $scriptParameters $config
+
+    # Only add override parameters if they exist in the script parameters
     $overrideParameters = @{
         srvInst   = $server
-        ForceSync = $ForceSync
+        ServerInstance = $server
+        SyncMode = $SyncMode
         dryRun    = $dryRun
+        uninstallDependents = $UninstallDependents
     }
-    $parameters += $overrideParameters
+    if ($SyncMode -eq "ForceSync") {
+        $overrideParameters["ForceSync"] = $true
+    }
+    foreach ($key in $overrideParameters.Keys) {
+        if ($scriptParameters -contains $key) {
+            $parameters[$key] = $overrideParameters[$key]
+        }
+    }
 
     return $parameters
 }
@@ -370,13 +384,22 @@ Write-Host "Script: $scriptPath"
 Write-Host "Server: $server"
 
 $parameters = Get-FinalParameters $scriptPath $config
+$installedAppInfos = $null
 
 # Execute the script
 $appsToInstall | ForEach-Object {
     $parameters["appPath"] = $_
+    if ($installedAppInfos -is [array] -and $installedAppInfos.Count -gt 0) {
+        $parameters["installedAppInfos"] = $installedAppInfos
+    }
+
     Write-Host "Installing application '$_':"
     Write-Host $scriptPath @parameters
-    & $scriptPath @parameters
+    $result = & $scriptPath @parameters
+
+    if ($result -is [array] -and $result.Count -gt 0) {
+        $installedAppInfos = $result
+    }
 }
 
 Remove-TempFiles $tempFolder
