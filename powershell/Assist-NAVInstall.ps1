@@ -64,7 +64,7 @@ param (
     [string]$configURI = "NAVInstall.config.json",
     [string]$server,
     [string]$appPath,
-    [string]$scriptURI = "https://raw.githubusercontent.com/CBS-BC-AT-Internal/INT.utilities/v0.3.0/powershell/app/Update-NAVApp.ps1",
+    [string]$scriptURI = "https://raw.githubusercontent.com/CBS-BC-AT-Internal/INT.utilities/v0.3.1/powershell/app/Update-NAVApp.ps1",
     [switch]$UninstallDependents,
     [ValidateSet("Add", "Clean", "Development", "ForceSync", "None")]
     [string]$SyncMode = "Add",
